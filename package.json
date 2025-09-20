@@ -1,0 +1,9 @@
+{
+  "name": "asso",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ]
+}
