@@ -5,5 +5,32 @@
   "workspaces": [
     "apps/api",
     "apps/web"
-  ]
+  ],
+  "scripts": {
+    "lint": "eslint . --ext .ts,.tsx,.js,.cjs,.mjs,.vue",
+    "format": "prettier --write .",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
+    "prettier": "^3.6.2",
+    "vue-eslint-parser": "10.2.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,cjs,mjs,vue}": [
+      "eslint --max-warnings=0 --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,scss,html,yaml,yml}": [
+      "prettier --write"
+    ]
+  }
 }
