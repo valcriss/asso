@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest"
+    "test": "vitest",
+    "lint": "echo \"Lint is managed at the repository root\"",
+    "format": "echo \"Format is managed at the repository root\""
   }
 }
