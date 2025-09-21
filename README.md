@@ -20,6 +20,7 @@ This repository is structured as an npm workspaces monorepo to host the two main
   - `npm run dev` — launches the backend in watch mode via `ts-node-dev` (entry point `src/main.ts`).
   - `npm run build` — compiles TypeScript sources to `dist/` using the workspace-specific `tsconfig.json`.
   - `npm run test` — reserved for the Vitest-based suite covering domain and HTTP layers.
+  - `npm run prisma:migrate` — runs Prisma migrations against the PostgreSQL database referenced by `DATABASE_URL`.
 - The TypeScript configuration outputs compiled code to `dist/` and keeps incremental build metadata next to the artifacts.
 
 ### Web (`apps/web`)
