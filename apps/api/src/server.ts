@@ -9,6 +9,7 @@ import { z } from 'zod';
 import type { IncomingHttpHeaders } from 'http';
 import idempotencyPlugin from './plugins/idempotency';
 import paginationPlugin from './plugins/pagination';
+import prismaPlugin from './plugins/prisma';
 import problemJsonPlugin from './plugins/problem-json';
 
 dotenv.config();
@@ -64,6 +65,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   app.decorate('config', config);
 
   await app.register(problemJsonPlugin);
+  await app.register(prismaPlugin);
 
   await app.register(rateLimit, {
     max: 100,
