@@ -44,7 +44,20 @@ export class HttpProblemError extends Error {
 }
 
 export function isHttpProblemError(error: unknown): error is HttpProblemError {
-  return error instanceof HttpProblemError;
+  if (error instanceof HttpProblemError) {
+    return true;
+  }
+
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as Partial<HttpProblemError> & { name?: string };
+  return (
+    candidate.name === 'HttpProblemError' &&
+    typeof candidate.status === 'number' &&
+    typeof candidate.title === 'string'
+  );
 }
 
 export function toProblemDetail(error: unknown, instance?: string): ProblemDetail {
@@ -71,7 +84,7 @@ interface NormalizedError {
 }
 
 function normalizeError(error: unknown): NormalizedError {
-  if (error instanceof HttpProblemError) {
+  if (isHttpProblemError(error)) {
     return {
       status: error.status,
       type: error.type,
