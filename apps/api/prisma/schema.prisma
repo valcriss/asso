@@ -22,6 +22,8 @@ model Organization {
   refreshTokens RefreshToken[]
   sequences   SequenceNumber[]
   fecExports  FecExport[]
+  bankAccounts BankAccount[]
+  bankStatements BankStatement[]
 
   @@map("organization")
 }
@@ -56,6 +58,7 @@ model Account {
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   entryLines     EntryLine[]
+  bankAccount    BankAccount?
 
   @@unique([organizationId, code], map: "account_org_code_key")
   @@index([organizationId, type], map: "account_org_type_idx")
@@ -89,6 +92,7 @@ model Entry {
   memo           String?
   lockedAt       DateTime?    @map("locked_at")
   createdBy      String?      @map("created_by")
+  bankStatementId String?     @map("bank_statement_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -96,11 +100,50 @@ model Entry {
   journal        Journal      @relation(fields: [journalId], references: [id], onDelete: Restrict)
   lines          EntryLine[]
   attachments    Attachment[]
+  bankStatement  BankStatement? @relation(fields: [bankStatementId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, date], map: "entry_org_date_idx")
   @@index([organizationId, fiscalYearId], map: "entry_org_fiscal_year_idx")
   @@index([organizationId, journalId, date], map: "entry_org_journal_date_idx")
+  @@index([organizationId, bankStatementId], map: "entry_org_bank_statement_idx")
   @@map("entry")
+}
+
+model BankAccount {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  accountId      String       @map("account_id") @db.Uuid @unique
+  name           String
+  iban           String
+  bic            String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  statements     BankStatement[]
+
+  @@unique([organizationId, accountId], map: "bank_account_org_account_key")
+  @@unique([organizationId, iban], map: "bank_account_org_iban_key")
+  @@index([organizationId], map: "bank_account_org_idx")
+  @@map("bank_account")
+}
+
+model BankStatement {
+  id             String        @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  bankAccountId  String        @map("bank_account_id") @db.Uuid
+  statementDate  DateTime      @map("statement_date")
+  openingBalance Decimal       @map("opening_balance") @db.Decimal(16, 2)
+  closingBalance Decimal       @map("closing_balance") @db.Decimal(16, 2)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bankAccount    BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  entries        Entry[]
+
+  @@unique([bankAccountId, statementDate], map: "bank_statement_account_date_key")
+  @@index([organizationId, bankAccountId], map: "bank_statement_org_account_idx")
+  @@map("bank_statement")
 }
 
 model SequenceNumber {

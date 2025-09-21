@@ -27,7 +27,7 @@ const amountSchema = z
 
     try {
       return new Prisma.Decimal(normalized);
-    } catch (error) {
+    } catch {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Amount is invalid.',
