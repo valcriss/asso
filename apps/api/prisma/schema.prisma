@@ -24,6 +24,8 @@ model Organization {
   fecExports  FecExport[]
   bankAccounts BankAccount[]
   bankStatements BankStatement[]
+  bankTransactions BankTransaction[]
+  ofxRules     OfxRule[]
 
   @@map("organization")
 }
@@ -101,6 +103,7 @@ model Entry {
   lines          EntryLine[]
   attachments    Attachment[]
   bankStatement  BankStatement? @relation(fields: [bankStatementId], references: [id], onDelete: SetNull)
+  bankMatches    BankTransaction[] @relation("BankTransactionMatchedEntry")
 
   @@index([organizationId, date], map: "entry_org_date_idx")
   @@index([organizationId, fiscalYearId], map: "entry_org_fiscal_year_idx")
@@ -121,6 +124,8 @@ model BankAccount {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
   statements     BankStatement[]
+  transactions   BankTransaction[]
+  ofxRules       OfxRule[]
 
   @@unique([organizationId, accountId], map: "bank_account_org_account_key")
   @@unique([organizationId, iban], map: "bank_account_org_iban_key")
@@ -140,10 +145,53 @@ model BankStatement {
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   bankAccount    BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   entries        Entry[]
+  transactions   BankTransaction[]
 
   @@unique([bankAccountId, statementDate], map: "bank_statement_account_date_key")
   @@index([organizationId, bankAccountId], map: "bank_statement_org_account_idx")
   @@map("bank_statement")
+}
+
+model BankTransaction {
+  id              String        @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  bankAccountId   String        @map("bank_account_id") @db.Uuid
+  bankStatementId String?       @map("bank_statement_id") @db.Uuid
+  fitId           String        @map("fitid")
+  valueDate       DateTime      @map("value_date")
+  amount          Decimal       @db.Decimal(16, 2)
+  rawLabel        String        @map("raw_label")
+  normalizedLabel String?       @map("normalized_label")
+  memo            String?
+  matchedEntryId  String?       @map("matched_entry_id") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bankAccount     BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  bankStatement   BankStatement? @relation(fields: [bankStatementId], references: [id], onDelete: SetNull)
+  matchedEntry    Entry?        @relation("BankTransactionMatchedEntry", fields: [matchedEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([bankAccountId, fitId, amount, valueDate], map: "bank_transaction_dedup_key")
+  @@index([organizationId, bankAccountId, valueDate], map: "bank_transaction_org_account_date_idx")
+  @@map("bank_transaction")
+}
+
+model OfxRule {
+  id              String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  bankAccountId   String?      @map("bank_account_id") @db.Uuid
+  pattern         String
+  normalizedLabel String       @map("normalized_label")
+  priority        Int          @default(0)
+  isActive        Boolean      @default(true) @map("is_active")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bankAccount     BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, priority], map: "ofx_rule_org_priority_idx")
+  @@index([organizationId, bankAccountId], map: "ofx_rule_org_account_idx")
+  @@map("ofx_rule")
 }
 
 model SequenceNumber {
