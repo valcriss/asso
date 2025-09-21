@@ -1,5 +1,5 @@
 import fp from 'fastify-plugin';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient, UserRole } from '@prisma/client';
 import { z } from 'zod';
 
 type Deferred<T> = {
@@ -19,6 +19,7 @@ interface TenantTransactionContext {
 export interface AuthenticatedUser {
   id: string;
   organizationId: string;
+  roles: UserRole[];
 }
 
 declare module 'fastify' {
