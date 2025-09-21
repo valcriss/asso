@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  name        String
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  fiscalYears FiscalYear[]
+  accounts    Account[]
+  journals    Journal[]
+  entries     Entry[]
+  entryLines  EntryLine[]
+  attachments Attachment[]
+
+  @@map("organization")
+}
+
+model FiscalYear {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  label          String
+  startDate      DateTime     @map("start_date")
+  endDate        DateTime     @map("end_date")
+  lockedAt       DateTime?    @map("locked_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entries        Entry[]
+
+  @@unique([organizationId, label], map: "fiscal_year_org_label_key")
+  @@index([organizationId, startDate], map: "fiscal_year_org_start_idx")
+  @@map("fiscal_year")
+}
+
+model Account {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  type           String
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entryLines     EntryLine[]
+
+  @@unique([organizationId, code], map: "account_org_code_key")
+  @@index([organizationId, type], map: "account_org_type_idx")
+  @@map("account")
+}
+
+model Journal {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  type           String
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entries        Entry[]
+
+  @@unique([organizationId, code], map: "journal_org_code_key")
+  @@index([organizationId, type], map: "journal_org_type_idx")
+  @@map("journal")
+}
+
+model Entry {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  fiscalYearId   String       @map("fiscal_year_id") @db.Uuid
+  journalId      String       @map("journal_id") @db.Uuid
+  date           DateTime
+  reference      String?      @map("ref")
+  memo           String?
+  lockedAt       DateTime?    @map("locked_at")
+  createdBy      String?      @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  journal        Journal      @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  lines          EntryLine[]
+  attachments    Attachment[]
+
+  @@index([organizationId, date], map: "entry_org_date_idx")
+  @@index([organizationId, fiscalYearId], map: "entry_org_fiscal_year_idx")
+  @@index([organizationId, journalId, date], map: "entry_org_journal_date_idx")
+  @@map("entry")
+}
+
+model EntryLine {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  entryId        String       @map("entry_id") @db.Uuid
+  accountId      String       @map("account_id") @db.Uuid
+  debit          Decimal      @default(0) @db.Decimal(16, 2)
+  credit         Decimal      @default(0) @db.Decimal(16, 2)
+  projectId      String?      @map("project_id")
+  memberId       String?      @map("member_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entry          Entry        @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, accountId], map: "entry_line_org_account_idx")
+  @@index([entryId], map: "entry_line_entry_idx")
+  @@map("entry_line")
+}
+
+model Attachment {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  entryId        String       @map("entry_id") @db.Uuid
+  url            String
+  filename       String
+  mime           String
+  sha256         String
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entry          Entry        @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, entryId], map: "attachment_org_entry_idx")
+  @@map("attachment")
+}
