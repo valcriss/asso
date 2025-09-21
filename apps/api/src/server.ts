@@ -2,9 +2,14 @@ import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import autoload from '@fastify/autoload';
 import env from '@fastify/env';
+import rateLimit from '@fastify/rate-limit';
 import dotenv from 'dotenv';
 import pino from 'pino';
 import { z } from 'zod';
+import type { IncomingHttpHeaders } from 'http';
+import idempotencyPlugin from './plugins/idempotency';
+import paginationPlugin from './plugins/pagination';
+import problemJsonPlugin from './plugins/problem-json';
 
 dotenv.config();
 
@@ -58,6 +63,26 @@ export async function buildServer(): Promise<FastifyInstance> {
   const config = envSchema.parse(app.envConfig);
   app.decorate('config', config);
 
+  await app.register(problemJsonPlugin);
+
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    keyGenerator: (request) => {
+      const tenantId = getTenantIdentifier(request.headers);
+      const clientIp = request.ip;
+      return tenantId ? `tenant:${tenantId}:ip:${clientIp}` : `ip:${clientIp}`;
+    },
+  });
+
+  await app.register(paginationPlugin, {
+    defaultPage: 1,
+    defaultLimit: 50,
+    maxLimit: 200,
+  });
+
+  await app.register(idempotencyPlugin);
+
   await app.register(autoload, {
     dir: join(__dirname, 'routes'),
     dirNameRoutePrefix: false,
@@ -70,3 +95,27 @@ export async function buildServer(): Promise<FastifyInstance> {
 }
 
 export default buildServer;
+
+function getTenantIdentifier(headers: IncomingHttpHeaders): string | null {
+  const tenantHeaderCandidates = [
+    'x-organization-id',
+    'x-tenant-id',
+    'x-org-id',
+  ] as const;
+
+  for (const headerName of tenantHeaderCandidates) {
+    const value = headers[headerName];
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+
+    if (Array.isArray(value) && value.length > 0) {
+      const candidate = value.find((item) => typeof item === 'string' && item.trim() !== '');
+      if (candidate) {
+        return candidate.trim();
+      }
+    }
+  }
+
+  return null;
+}
