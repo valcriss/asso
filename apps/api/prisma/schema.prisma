@@ -18,6 +18,8 @@ model Organization {
   entries     Entry[]
   entryLines  EntryLine[]
   attachments Attachment[]
+  memberships UserOrgRole[]
+  refreshTokens RefreshToken[]
 
   @@map("organization")
 }
@@ -131,4 +133,56 @@ model Attachment {
 
   @@index([organizationId, entryId], map: "attachment_org_entry_idx")
   @@map("attachment")
+}
+
+model User {
+  id            String          @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  email         String          @unique
+  passwordHash  String          @map("password_hash")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  roles         UserOrgRole[]
+  refreshTokens RefreshToken[]
+
+  @@map("user")
+}
+
+model UserOrgRole {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  role           UserRole
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, organizationId, role], map: "user_org_role_user_org_role_key")
+  @@index([organizationId, role], map: "user_org_role_org_role_idx")
+  @@map("user_org_role")
+}
+
+model RefreshToken {
+  id                String        @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  userId            String        @map("user_id") @db.Uuid
+  organizationId    String        @map("organization_id") @db.Uuid
+  expiresAt         DateTime      @map("expires_at")
+  revokedAt         DateTime?     @map("revoked_at")
+  replacedByTokenId String?       @map("replaced_by_token_id") @db.Uuid
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  replacedBy        RefreshToken? @relation("RefreshTokenReplacement", fields: [replacedByTokenId], references: [id])
+  replacements      RefreshToken[] @relation("RefreshTokenReplacement")
+
+  @@index([userId, organizationId], map: "refresh_token_user_org_idx")
+  @@map("refresh_token")
+}
+
+enum UserRole {
+  ADMIN
+  TREASURER
+  SECRETARY
+  VIEWER
 }

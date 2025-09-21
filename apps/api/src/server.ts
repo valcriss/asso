@@ -11,6 +11,7 @@ import idempotencyPlugin from './plugins/idempotency';
 import paginationPlugin from './plugins/pagination';
 import prismaPlugin from './plugins/prisma';
 import problemJsonPlugin from './plugins/problem-json';
+import authPlugin from './plugins/auth';
 
 dotenv.config();
 
@@ -20,12 +21,18 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),
+  JWT_ACCESS_SECRET: z.string().min(32).default('dev-access-secret-change-me-please-0123456789'),
+  JWT_REFRESH_SECRET: z.string().min(32).default('dev-refresh-secret-change-me-please-0123456789'),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
 });
 
 type RawEnvConfig = {
   NODE_ENV?: string;
   PORT?: number;
   LOG_LEVEL?: string;
+  JWT_ACCESS_SECRET?: string;
+  JWT_REFRESH_SECRET?: string;
+  REFRESH_TOKEN_TTL_DAYS?: number;
 };
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -57,6 +64,15 @@ export async function buildServer(): Promise<FastifyInstance> {
         NODE_ENV: { type: 'string', default: 'development' },
         PORT: { type: 'number', default: 3000 },
         LOG_LEVEL: { type: 'string', default: 'info' },
+        JWT_ACCESS_SECRET: {
+          type: 'string',
+          default: 'dev-access-secret-change-me-please-0123456789',
+        },
+        JWT_REFRESH_SECRET: {
+          type: 'string',
+          default: 'dev-refresh-secret-change-me-please-0123456789',
+        },
+        REFRESH_TOKEN_TTL_DAYS: { type: 'number', default: 30 },
       },
     },
   });
@@ -65,6 +81,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   app.decorate('config', config);
 
   await app.register(problemJsonPlugin);
+  await app.register(authPlugin);
   await app.register(prismaPlugin);
 
   await app.register(rateLimit, {
