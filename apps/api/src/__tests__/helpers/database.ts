@@ -1,33 +1,60 @@
+import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Client as PgClient } from 'pg';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 export const ADMIN_ROOT_URL = 'postgresql://postgres:postgres@localhost:5432/postgres';
-export const DATABASE_NAME = 'asso_test';
-export const ADMIN_DATABASE_URL = `postgresql://postgres:postgres@localhost:5432/${DATABASE_NAME}`;
 export const APP_ROLE = 'app_user';
 export const APP_PASSWORD = 'app_user_password';
-export const APP_DATABASE_URL = `postgresql://${APP_ROLE}:${APP_PASSWORD}@localhost:5432/${DATABASE_NAME}`;
+
+let currentDatabaseName: string | null = null;
+let initializationPromise: Promise<void> | null = null;
+let activeClients = 0;
+let roleInitializationPromise: Promise<void> | null = null;
 
 export async function setupTestDatabase(): Promise<void> {
-  await recreateDatabase(DATABASE_NAME);
-  await ensureApplicationRole();
-  await runMigrations();
-  await grantApplicationPrivileges();
+  activeClients += 1;
 
-  process.env.DATABASE_URL = APP_DATABASE_URL;
+  if (!initializationPromise) {
+    initializationPromise = initializeDatabase().catch((error) => {
+      initializationPromise = null;
+      throw error;
+    });
+  }
+
+  await initializationPromise;
+
+  if (!currentDatabaseName) {
+    throw new Error('Test database initialization failed');
+  }
+
+  process.env.DATABASE_URL = buildAppDatabaseUrl(currentDatabaseName);
 }
 
 export async function teardownTestDatabase(): Promise<void> {
+  activeClients = Math.max(0, activeClients - 1);
+
+  if (activeClients > 0 || !currentDatabaseName) {
+    return;
+  }
+
+  const databaseName = currentDatabaseName;
+  currentDatabaseName = null;
+  initializationPromise = null;
+
   const adminClient = new PgClient({ connectionString: ADMIN_ROOT_URL });
   await adminClient.connect();
-  await adminClient.query(`DROP DATABASE IF EXISTS "${DATABASE_NAME}"`);
+  await adminClient.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
   await adminClient.end();
 }
 
 export async function resetDatabase(): Promise<void> {
-  const adminClient = new PgClient({ connectionString: ADMIN_DATABASE_URL });
+  if (!currentDatabaseName) {
+    throw new Error('Test database is not initialized');
+  }
+
+  const adminClient = new PgClient({ connectionString: buildAdminDatabaseUrl(currentDatabaseName) });
   await adminClient.connect();
   await adminClient.query(
     'TRUNCATE TABLE "refresh_token", "user_org_role", "user", "attachment", "entry_line", "entry", "journal", "account", "fiscal_year", "organization" RESTART IDENTITY CASCADE'
@@ -36,10 +63,15 @@ export async function resetDatabase(): Promise<void> {
 }
 
 export function createPrismaClient(): PrismaClient {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL is not configured. Did you call setupTestDatabase()?');
+  }
+
   return new PrismaClient({
     datasources: {
       db: {
-        url: APP_DATABASE_URL,
+        url,
       },
     },
   });
@@ -50,12 +82,26 @@ export async function applyTenantContext(tx: Prisma.TransactionClient, organizat
   await tx.$executeRaw(statement);
 }
 
+function buildAdminDatabaseUrl(name: string): string {
+  return `postgresql://postgres:postgres@localhost:5432/${name}`;
+}
+
+function buildAppDatabaseUrl(name: string): string {
+  return `postgresql://${APP_ROLE}:${APP_PASSWORD}@localhost:5432/${name}`;
+}
+
 async function recreateDatabase(name: string): Promise<void> {
   const adminClient = new PgClient({ connectionString: ADMIN_ROOT_URL });
   await adminClient.connect();
-  await adminClient.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1', [name]);
-  await adminClient.query(`DROP DATABASE IF EXISTS "${name}"`);
-  await adminClient.query(`CREATE DATABASE "${name}"`);
+  await adminClient.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+  try {
+    await adminClient.query(`CREATE DATABASE "${name}"`);
+  } catch (error) {
+    if (!isDuplicateDatabaseError(error)) {
+      await adminClient.end();
+      throw error;
+    }
+  }
   await adminClient.end();
 }
 
@@ -65,16 +111,28 @@ async function ensureApplicationRole(): Promise<void> {
   const result = await adminClient.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [APP_ROLE]);
 
   if (result.rowCount === 0) {
-    await adminClient.query(`CREATE ROLE "${APP_ROLE}" WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+    try {
+      await adminClient.query(`CREATE ROLE "${APP_ROLE}" WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
+    } catch (error) {
+      if (!isDuplicateRoleError(error)) {
+        throw error;
+      }
+    }
   } else {
-    await adminClient.query(`ALTER ROLE "${APP_ROLE}" WITH PASSWORD '${APP_PASSWORD}'`);
+    try {
+      await adminClient.query(`ALTER ROLE "${APP_ROLE}" WITH PASSWORD '${APP_PASSWORD}'`);
+    } catch (error) {
+      if (!isConcurrentUpdateError(error)) {
+        throw error;
+      }
+    }
   }
 
   await adminClient.end();
 }
 
-async function runMigrations(): Promise<void> {
-  const client = new PgClient({ connectionString: ADMIN_DATABASE_URL });
+async function runMigrations(databaseName: string): Promise<void> {
+  const client = new PgClient({ connectionString: buildAdminDatabaseUrl(databaseName) });
   await client.connect();
 
   const migrationsDir = join(__dirname, '../../../prisma/migrations');
@@ -88,13 +146,13 @@ async function runMigrations(): Promise<void> {
   await client.end();
 }
 
-async function grantApplicationPrivileges(): Promise<void> {
+async function grantApplicationPrivileges(databaseName: string): Promise<void> {
   const rootClient = new PgClient({ connectionString: ADMIN_ROOT_URL });
   await rootClient.connect();
-  await rootClient.query(`GRANT CONNECT ON DATABASE "${DATABASE_NAME}" TO "${APP_ROLE}"`);
+  await rootClient.query(`GRANT CONNECT ON DATABASE "${databaseName}" TO "${APP_ROLE}"`);
   await rootClient.end();
 
-  const adminClient = new PgClient({ connectionString: ADMIN_DATABASE_URL });
+  const adminClient = new PgClient({ connectionString: buildAdminDatabaseUrl(databaseName) });
   await adminClient.connect();
   await adminClient.query(`GRANT USAGE ON SCHEMA public TO "${APP_ROLE}"`);
   await adminClient.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "${APP_ROLE}"`);
@@ -104,4 +162,61 @@ async function grantApplicationPrivileges(): Promise<void> {
   );
   await adminClient.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO "${APP_ROLE}"`);
   await adminClient.end();
+}
+
+async function initializeDatabase(): Promise<void> {
+  const databaseName = generateDatabaseName();
+  await ensureRoleInitialized();
+  await recreateDatabase(databaseName);
+  await runMigrations(databaseName);
+  await grantApplicationPrivileges(databaseName);
+  currentDatabaseName = databaseName;
+  process.env.DATABASE_URL = buildAppDatabaseUrl(databaseName);
+}
+
+async function ensureRoleInitialized(): Promise<void> {
+  if (!roleInitializationPromise) {
+    roleInitializationPromise = ensureApplicationRole().catch((error) => {
+      roleInitializationPromise = null;
+      throw error;
+    });
+  }
+
+  await roleInitializationPromise;
+}
+
+function generateDatabaseName(): string {
+  return `asso_test_${randomUUID().replace(/-/g, '')}`;
+}
+
+interface PgError {
+  code?: string;
+  message?: string;
+}
+
+function isDuplicateDatabaseError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const pgError = error as PgError;
+  return pgError.code === '42P04' || pgError.code === '23505';
+}
+
+function isDuplicateRoleError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const pgError = error as PgError;
+  return pgError.code === '42710';
+}
+
+function isConcurrentUpdateError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const pgError = error as PgError;
+  return pgError.code === '40001' || pgError.message?.includes('tuple concurrently updated');
 }

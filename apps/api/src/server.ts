@@ -15,6 +15,14 @@ import authPlugin from './plugins/auth';
 
 dotenv.config();
 
+if (process.env.NODE_ENV !== 'production') {
+  if (!process.env.FASTIFY_AUTOLOAD_TYPESCRIPT) {
+    process.env.FASTIFY_AUTOLOAD_TYPESCRIPT = '1';
+  }
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('esbuild-register');
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),

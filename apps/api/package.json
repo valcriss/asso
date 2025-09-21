@@ -30,8 +30,11 @@
     "@types/jsonwebtoken": "9.0.7",
     "@types/node": "24.5.2",
     "@types/pg": "8.11.6",
+    "esbuild-register": "3.6.0",
     "pg": "8.13.1",
     "prisma": "6.16.2",
+    "supertest": "6.3.4",
+    "ts-node": "10.9.2",
     "ts-node-dev": "2.0.0",
     "typescript": "5.9.2",
     "vitest": "2.1.4"

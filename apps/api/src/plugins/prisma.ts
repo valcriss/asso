@@ -79,7 +79,7 @@ const prismaPlugin = fp(async (fastify) => {
   await prisma.$connect();
 
   fastify.decorate('prisma', prisma);
-  fastify.decorateRequest('prisma', prisma);
+  fastify.decorateRequest('prisma', undefined as unknown as PrismaClient | Prisma.TransactionClient);
   fastify.decorateRequest('tenantTransaction', undefined as TenantTransactionContext | undefined);
 
   fastify.addHook('onRequest', async (request) => {
