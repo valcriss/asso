@@ -20,6 +20,7 @@ model Organization {
   attachments Attachment[]
   memberships UserOrgRole[]
   refreshTokens RefreshToken[]
+  sequences   SequenceNumber[]
 
   @@map("organization")
 }
@@ -35,6 +36,7 @@ model FiscalYear {
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   entries        Entry[]
+  sequences      SequenceNumber[]
 
   @@unique([organizationId, label], map: "fiscal_year_org_label_key")
   @@index([organizationId, startDate], map: "fiscal_year_org_start_idx")
@@ -68,6 +70,7 @@ model Journal {
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   entries        Entry[]
+  sequences      SequenceNumber[]
 
   @@unique([organizationId, code], map: "journal_org_code_key")
   @@index([organizationId, type], map: "journal_org_type_idx")
@@ -96,6 +99,22 @@ model Entry {
   @@index([organizationId, fiscalYearId], map: "entry_org_fiscal_year_idx")
   @@index([organizationId, journalId, date], map: "entry_org_journal_date_idx")
   @@map("entry")
+}
+
+model SequenceNumber {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  fiscalYearId   String       @map("fiscal_year_id") @db.Uuid
+  journalId      String       @map("journal_id") @db.Uuid
+  nextValue      Int          @default(1) @map("next_value")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  journal        Journal      @relation(fields: [journalId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, fiscalYearId, journalId], map: "sequence_number_org_year_journal_key")
+  @@map("sequence_number")
 }
 
 model EntryLine {
