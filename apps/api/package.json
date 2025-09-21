@@ -2,12 +2,26 @@
   "name": "@asso/api",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "lint": "echo \"Lint is managed at the repository root\"",
-    "format": "echo \"Format is managed at the repository root\""
+    "format": "echo \"Format is managed at the repository root\"",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@fastify/autoload": "6.3.1",
+    "@fastify/env": "5.0.2",
+    "dotenv": "17.2.2",
+    "fastify": "5.6.0",
+    "pino": "9.11.0",
+    "zod": "4.1.11"
+  },
+  "devDependencies": {
+    "@types/node": "24.5.2",
+    "ts-node-dev": "2.0.0",
+    "typescript": "5.9.2"
   }
 }
