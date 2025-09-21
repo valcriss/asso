@@ -10,6 +10,10 @@ import {
   updateBankAccount,
 } from '../modules/accounting/bank-accounts';
 import { recordBankStatement } from '../modules/accounting/bank-statements';
+import {
+  getReconciliationSuggestions,
+  importOfxTransactions,
+} from '../modules/accounting/bank-transactions';
 
 const organizationParamsSchema = z.object({
   orgId: z.string().uuid(),
@@ -91,6 +95,30 @@ const bankRoutes: FastifyPluginAsync = async (fastify) => {
 
       const statement = await recordBankStatement(request.prisma, orgId, request.body);
       reply.status(201).send({ data: statement });
+    }
+  );
+
+  fastify.post(
+    '/orgs/:orgId/bank/import-ofx',
+    { preHandler: requireTreasuryRole },
+    async (request, reply) => {
+      const { orgId } = organizationParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const result = await importOfxTransactions(request.prisma, orgId, request.body);
+      reply.status(201).send({ data: result });
+    }
+  );
+
+  fastify.post(
+    '/orgs/:orgId/bank/reconcile',
+    { preHandler: requireTreasuryRole },
+    async (request) => {
+      const { orgId } = organizationParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const result = await getReconciliationSuggestions(request.prisma, orgId, request.body);
+      return { data: result };
     }
   );
 };

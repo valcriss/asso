@@ -247,6 +247,155 @@ describe('bank routes', () => {
 
     expect(entry?.bankStatementId).toBeNull();
   });
+
+  it('imports OFX transactions with deduplication and normalization', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+    const fixtures = await seedBankingFixtures(organizationId);
+
+    const bankAccountResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/accounts`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        accountId: fixtures.bankLedgerAccount.id,
+        name: 'Compte OFX',
+        iban: VALID_IBAN,
+        bic: 'AGRIFRPP',
+      });
+
+    const bankAccountId = bankAccountResponse.body.data.id as string;
+
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      await tx.ofxRule.create({
+        data: {
+          organizationId,
+          normalizedLabel: 'Cotisation annuelle',
+          pattern: 'ADH[ÉE]SION',
+          priority: 10,
+        },
+      });
+
+      await tx.bankTransaction.create({
+        data: {
+          organizationId,
+          bankAccountId,
+          fitId: 'FIT-002',
+          valueDate: new Date('2025-01-10T00:00:00.000Z'),
+          amount: '-70.00',
+          rawLabel: 'Frais bancaires',
+          normalizedLabel: 'Frais bancaires',
+          memo: 'Commission bancaire',
+        },
+      });
+    });
+
+    const ofxPayload = `OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\nSECURITY:NONE\nENCODING:USASCII\nCHARSET:1252\nCOMPRESSION:NONE\nOLDFILEUID:NONE\nNEWFILEUID:NONE\n\n<OFX>\n  <BANKMSGSRSV1>\n    <STMTTRNRS>\n      <STMTRS>\n        <BANKTRANLIST>\n          <DTSTART>20250101000000\n          <DTEND>20250131000000\n          <STMTTRN>\n            <TRNTYPE>CREDIT\n            <DTPOSTED>20250105120000\n            <TRNAMT>200.00\n            <FITID>FIT-001\n            <NAME>Adhésion annuelle\n            <MEMO>Adhésion 2025\n          </STMTTRN>\n          <STMTTRN>\n            <TRNTYPE>DEBIT\n            <DTPOSTED>20250110120000\n            <TRNAMT>-70.00\n            <FITID>FIT-002\n            <NAME>Frais bancaires\n            <MEMO>Commission bancaire\n          </STMTTRN>\n          <STMTTRN>\n            <TRNTYPE>CREDIT\n            <DTPOSTED>20250105120000\n            <TRNAMT>200.00\n            <FITID>FIT-001\n            <NAME>Adhésion annuelle duplicate\n          </STMTTRN>\n        </BANKTRANLIST>\n      </STMTRS>\n    </STMTTRNRS>\n  </BANKMSGSRSV1>\n</OFX>\n`;
+
+    const importResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/import-ofx`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ bankAccountId, ofx: ofxPayload });
+
+    expect(importResponse.statusCode).toBe(201);
+    expect(importResponse.body.data.imported).toBe(1);
+    expect(importResponse.body.data.duplicates).toBe(2);
+    expect(importResponse.body.data.transactions).toHaveLength(1);
+    expect(importResponse.body.data.transactions[0].rawLabel).toBe('Adhésion annuelle');
+    expect(importResponse.body.data.transactions[0].normalizedLabel).toBe('Cotisation annuelle');
+
+    const transactions = await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      return tx.bankTransaction.findMany({
+        where: { bankAccountId },
+        orderBy: { valueDate: 'asc' },
+      });
+    });
+
+    expect(transactions).toHaveLength(2);
+    expect(transactions.some((txn) => txn.fitId === 'FIT-001')).toBe(true);
+    expect(transactions.some((txn) => txn.fitId === 'FIT-002')).toBe(true);
+  });
+
+  it('suggests reconciliation candidates with exact and fuzzy rules', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+    const fixtures = await seedBankingFixtures(organizationId);
+
+    const bankAccountResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/accounts`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        accountId: fixtures.bankLedgerAccount.id,
+        name: 'Compte Reco',
+        iban: VALID_IBAN,
+        bic: 'AGRIFRPP',
+      });
+
+    const bankAccountId = bankAccountResponse.body.data.id as string;
+
+    const exactEntryResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/entries`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        fiscalYearId: fixtures.fiscalYear.id,
+        journalId: fixtures.journal.id,
+        date: '2025-01-09',
+        memo: 'Cotisation annuelle Janvier',
+        lines: [
+          { accountId: fixtures.bankLedgerAccount.id, debit: '200.00' },
+          { accountId: fixtures.revenueAccount.id, credit: '200.00' },
+        ],
+      });
+
+    const fuzzyEntryResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/entries`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        fiscalYearId: fixtures.fiscalYear.id,
+        journalId: fixtures.journal.id,
+        date: '2025-01-10',
+        memo: 'Cotisation annuelle règlement',
+        lines: [
+          { accountId: fixtures.bankLedgerAccount.id, debit: '199.99' },
+          { accountId: fixtures.revenueAccount.id, credit: '199.99' },
+        ],
+      });
+
+    const transaction = await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      return tx.bankTransaction.create({
+        data: {
+          organizationId,
+          bankAccountId,
+          fitId: 'RECO-001',
+          valueDate: new Date('2025-01-08T00:00:00.000Z'),
+          amount: '200.00',
+          rawLabel: 'Cotisation annuelle',
+          normalizedLabel: 'Cotisation annuelle',
+        },
+      });
+    });
+
+    const reconcileResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/reconcile`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ transactionId: transaction.id });
+
+    expect(reconcileResponse.statusCode).toBe(200);
+    expect(reconcileResponse.body.data.transactionId).toBe(transaction.id);
+    expect(reconcileResponse.body.data.suggestions.length).toBeGreaterThanOrEqual(2);
+
+    const [firstSuggestion, secondSuggestion] = reconcileResponse.body.data.suggestions as Array<{
+      entryId: string;
+      matchType: string;
+      similarity?: number;
+    }>;
+
+    expect(firstSuggestion.entryId).toBe(exactEntryResponse.body.data.id);
+    expect(firstSuggestion.matchType).toBe('EXACT');
+    expect(secondSuggestion.entryId).toBe(fuzzyEntryResponse.body.data.id);
+    expect(secondSuggestion.matchType).toBe('FUZZY');
+    expect(secondSuggestion.similarity).toBeGreaterThanOrEqual(0.7);
+  });
 });
 
 async function createUserWithRole(role: UserRole) {
