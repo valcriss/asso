@@ -313,7 +313,6 @@ async function createTablePdf(title: string, headers: string[], rows: string[][]
   const font = await document.embedFont(StandardFonts.Helvetica);
   let page = document.addPage();
   const margin = 40;
-  const lineHeight = 14;
   let y = page.getHeight() - margin;
 
   const drawText = (text: string, size = 12) => {

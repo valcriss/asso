@@ -19,7 +19,7 @@ if (process.env.NODE_ENV !== 'production') {
   if (!process.env.FASTIFY_AUTOLOAD_TYPESCRIPT) {
     process.env.FASTIFY_AUTOLOAD_TYPESCRIPT = '1';
   }
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   require('esbuild-register');
 }
 
