@@ -57,7 +57,7 @@ export async function resetDatabase(): Promise<void> {
   const adminClient = new PgClient({ connectionString: buildAdminDatabaseUrl(currentDatabaseName) });
   await adminClient.connect();
   await adminClient.query(
-    'TRUNCATE TABLE "refresh_token", "user_org_role", "user", "attachment", "entry_line", "entry", "sequence_number", "journal", "account", "fiscal_year", "organization" RESTART IDENTITY CASCADE'
+    'TRUNCATE TABLE "refresh_token", "user_org_role", "user", "attachment", "fec_export", "entry_line", "entry", "sequence_number", "journal", "account", "fiscal_year", "organization" RESTART IDENTITY CASCADE'
   );
   await adminClient.end();
 }
@@ -218,5 +218,7 @@ function isConcurrentUpdateError(error: unknown): boolean {
   }
 
   const pgError = error as PgError;
-  return pgError.code === '40001' || pgError.message?.includes('tuple concurrently updated');
+  const messageIndicatesConcurrency =
+    typeof pgError.message === 'string' && pgError.message.includes('tuple concurrently updated');
+  return pgError.code === '40001' || messageIndicatesConcurrency;
 }

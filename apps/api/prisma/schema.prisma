@@ -21,6 +21,7 @@ model Organization {
   memberships UserOrgRole[]
   refreshTokens RefreshToken[]
   sequences   SequenceNumber[]
+  fecExports  FecExport[]
 
   @@map("organization")
 }
@@ -37,6 +38,7 @@ model FiscalYear {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   entries        Entry[]
   sequences      SequenceNumber[]
+  fecExports     FecExport[]
 
   @@unique([organizationId, label], map: "fiscal_year_org_label_key")
   @@index([organizationId, startDate], map: "fiscal_year_org_start_idx")
@@ -115,6 +117,19 @@ model SequenceNumber {
 
   @@unique([organizationId, fiscalYearId, journalId], map: "sequence_number_org_year_journal_key")
   @@map("sequence_number")
+}
+
+model FecExport {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  fiscalYearId   String       @map("fiscal_year_id") @db.Uuid
+  checksum       String
+  generatedAt    DateTime     @default(now()) @map("generated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, fiscalYearId], map: "fec_export_org_year_idx")
+  @@map("fec_export")
 }
 
 model EntryLine {
