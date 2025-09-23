@@ -379,7 +379,7 @@ function compileOfxRules(rules: Array<{ pattern: string; normalizedLabel: string
     try {
       const regex = new RegExp(rule.pattern, 'i');
       compiled.push({ regex, normalizedLabel });
-    } catch (error) {
+    } catch {
       // Ignore invalid regular expressions
     }
   }
@@ -422,7 +422,7 @@ function sumEntryLines(
 function safeDecimal(value: string): PrismaNamespace.Decimal | null {
   try {
     return new PrismaNamespace.Decimal(value);
-  } catch (error) {
+  } catch {
     return null;
   }
 }

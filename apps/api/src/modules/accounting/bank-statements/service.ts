@@ -117,7 +117,7 @@ export async function recordBankStatement(
     });
   }
 
-  return client.bankStatement.findUnique({
+  const persisted = await client.bankStatement.findUnique({
     where: { id: statement.id },
     include: {
       entries: {
@@ -126,6 +126,20 @@ export async function recordBankStatement(
       },
     },
   });
+
+  if (!persisted) {
+    throw new HttpProblemError({
+      status: 500,
+      title: 'BANK_STATEMENT_PERSISTENCE_ERROR',
+      detail: 'The bank statement could not be retrieved after creation.',
+    });
+  }
+
+  return {
+    ...persisted,
+    openingBalance: persisted.openingBalance.toFixed(2),
+    closingBalance: persisted.closingBalance.toFixed(2),
+  };
 }
 
 function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown, detail: string): z.infer<T> {

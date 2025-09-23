@@ -515,6 +515,7 @@ export async function generateFecReport(
       { entry: { date: 'asc' } },
       { entry: { reference: 'asc' } },
       { entry: { id: 'asc' } },
+      { account: { code: 'asc' } },
       { id: 'asc' },
     ],
     include: {

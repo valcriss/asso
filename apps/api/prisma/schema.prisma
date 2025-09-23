@@ -26,6 +26,9 @@ model Organization {
   bankStatements BankStatement[]
   bankTransactions BankTransaction[]
   ofxRules     OfxRule[]
+  members      Member[]
+  membershipFeeTemplates MembershipFeeTemplate[]
+  memberFeeAssignments MemberFeeAssignment[]
 
   @@map("organization")
 }
@@ -104,6 +107,7 @@ model Entry {
   attachments    Attachment[]
   bankStatement  BankStatement? @relation(fields: [bankStatementId], references: [id], onDelete: SetNull)
   bankMatches    BankTransaction[] @relation("BankTransactionMatchedEntry")
+  memberFeeAssignments MemberFeeAssignment[]
 
   @@index([organizationId, date], map: "entry_org_date_idx")
   @@index([organizationId, fiscalYearId], map: "entry_org_fiscal_year_idx")
@@ -231,16 +235,89 @@ model EntryLine {
   debit          Decimal      @default(0) @db.Decimal(16, 2)
   credit         Decimal      @default(0) @db.Decimal(16, 2)
   projectId      String?      @map("project_id")
-  memberId       String?      @map("member_id")
+  memberId       String?      @map("member_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   entry          Entry        @relation(fields: [entryId], references: [id], onDelete: Restrict)
   account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  member         Member?      @relation(fields: [memberId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, accountId], map: "entry_line_org_account_idx")
   @@index([entryId], map: "entry_line_entry_idx")
   @@map("entry_line")
+}
+
+model Member {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  firstName      String       @map("first_name")
+  lastName       String       @map("last_name")
+  email          String
+  membershipType String       @map("membership_type")
+  joinedAt       DateTime?    @map("joined_at")
+  leftAt         DateTime?    @map("left_at")
+  rgpdConsentAt  DateTime?    @map("rgpd_consent_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  feeAssignments MemberFeeAssignment[]
+  entryLines     EntryLine[]
+
+  @@unique([organizationId, email], map: "member_org_email_key")
+  @@index([organizationId, membershipType], map: "member_org_type_idx")
+  @@index([organizationId, joinedAt], map: "member_org_joined_idx")
+  @@map("member")
+}
+
+model MembershipFeeTemplate {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  label          String
+  amount         Decimal      @db.Decimal(16, 2)
+  currency       String       @default("EUR")
+  membershipType String?      @map("membership_type")
+  validFrom      DateTime     @map("valid_from")
+  validUntil     DateTime?    @map("valid_until")
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assignments    MemberFeeAssignment[]
+
+  @@index([organizationId, isActive], map: "membership_fee_template_org_active_idx")
+  @@index([organizationId, membershipType], map: "membership_fee_template_org_type_idx")
+  @@index([organizationId, validFrom], map: "membership_fee_template_org_valid_from_idx")
+  @@map("membership_fee_template")
+}
+
+model MemberFeeAssignment {
+  id             String                     @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String                     @map("organization_id") @db.Uuid
+  memberId       String                     @map("member_id") @db.Uuid
+  templateId     String                     @map("template_id") @db.Uuid
+  amount         Decimal                    @db.Decimal(16, 2)
+  currency       String                     @default("EUR")
+  status         MemberFeeAssignmentStatus  @default(PENDING)
+  periodStart    DateTime                   @map("period_start")
+  periodEnd      DateTime?                  @map("period_end")
+  dueDate        DateTime?                  @map("due_date")
+  assignedAt     DateTime                   @default(now()) @map("assigned_at")
+  autoAssigned   Boolean                    @default(false) @map("auto_assigned")
+  entryId        String?                    @map("entry_id") @db.Uuid
+  draftInvoiceId String?                    @map("draft_invoice_id")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member         Member                     @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  template       MembershipFeeTemplate      @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  entry          Entry?                     @relation(fields: [entryId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, memberId, templateId, periodStart], map: "member_fee_assignment_unique_period")
+  @@index([organizationId, memberId], map: "member_fee_assignment_org_member_idx")
+  @@index([organizationId, templateId], map: "member_fee_assignment_org_template_idx")
+  @@index([organizationId, status], map: "member_fee_assignment_org_status_idx")
+  @@map("member_fee_assignment")
 }
 
 model Attachment {
@@ -310,4 +387,11 @@ enum UserRole {
   TREASURER
   SECRETARY
   VIEWER
+}
+
+enum MemberFeeAssignmentStatus {
+  PENDING
+  INVOICED
+  PAID
+  CANCELLED
 }
