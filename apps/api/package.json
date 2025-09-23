@@ -30,8 +30,8 @@
   "devDependencies": {
     "@types/jsonwebtoken": "9.0.7",
     "@types/node": "24.5.2",
-    "@types/supertest": "2.0.16",
     "@types/pg": "8.11.6",
+    "@types/supertest": "2.0.16",
     "esbuild-register": "3.6.0",
     "pg": "8.13.1",
     "prisma": "6.16.2",

@@ -12,13 +12,23 @@ let currentDatabaseName: string | null = null;
 let initializationPromise: Promise<void> | null = null;
 let activeClients = 0;
 let roleInitializationPromise: Promise<void> | null = null;
+let setupLock: Promise<void> = Promise.resolve();
+let releaseSetupLock: (() => void) | null = null;
 
 export async function setupTestDatabase(): Promise<void> {
+  await setupLock;
+
+  setupLock = new Promise<void>((resolve) => {
+    releaseSetupLock = resolve;
+  });
+
   activeClients += 1;
 
   if (!initializationPromise) {
     initializationPromise = initializeDatabase().catch((error) => {
       initializationPromise = null;
+      releaseCurrentSetupLock();
+      activeClients = Math.max(0, activeClients - 1);
       throw error;
     });
   }
@@ -26,6 +36,8 @@ export async function setupTestDatabase(): Promise<void> {
   await initializationPromise;
 
   if (!currentDatabaseName) {
+    releaseCurrentSetupLock();
+    activeClients = Math.max(0, activeClients - 1);
     throw new Error('Test database initialization failed');
   }
 
@@ -36,6 +48,9 @@ export async function teardownTestDatabase(): Promise<void> {
   activeClients = Math.max(0, activeClients - 1);
 
   if (activeClients > 0 || !currentDatabaseName) {
+    if (activeClients === 0) {
+      releaseCurrentSetupLock();
+    }
     return;
   }
 
@@ -47,6 +62,8 @@ export async function teardownTestDatabase(): Promise<void> {
   await adminClient.connect();
   await adminClient.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
   await adminClient.end();
+
+  releaseCurrentSetupLock();
 }
 
 export async function resetDatabase(): Promise<void> {
@@ -57,7 +74,7 @@ export async function resetDatabase(): Promise<void> {
   const adminClient = new PgClient({ connectionString: buildAdminDatabaseUrl(currentDatabaseName) });
   await adminClient.connect();
   await adminClient.query(
-    'TRUNCATE TABLE "refresh_token", "user_org_role", "user", "attachment", "fec_export", "bank_transaction", "ofx_rule", "entry_line", "entry", "bank_statement", "bank_account", "sequence_number", "journal", "account", "fiscal_year", "organization" RESTART IDENTITY CASCADE'
+    'TRUNCATE TABLE "refresh_token", "user_org_role", "user", "member_fee_assignment", "membership_fee_template", "member", "attachment", "fec_export", "bank_transaction", "ofx_rule", "entry_line", "entry", "bank_statement", "bank_account", "sequence_number", "journal", "account", "fiscal_year", "organization" RESTART IDENTITY CASCADE'
   );
   await adminClient.end();
 }
@@ -189,6 +206,14 @@ function generateDatabaseName(): string {
   return `asso_test_${randomUUID().replace(/-/g, '')}`;
 }
 
+function releaseCurrentSetupLock(): void {
+  if (releaseSetupLock) {
+    releaseSetupLock();
+    releaseSetupLock = null;
+    setupLock = Promise.resolve();
+  }
+}
+
 interface PgError {
   code?: string;
   message?: string;
@@ -209,7 +234,7 @@ function isDuplicateRoleError(error: unknown): boolean {
   }
 
   const pgError = error as PgError;
-  return pgError.code === '42710';
+  return pgError.code === '42710' || pgError.code === '23505';
 }
 
 function isConcurrentUpdateError(error: unknown): boolean {
