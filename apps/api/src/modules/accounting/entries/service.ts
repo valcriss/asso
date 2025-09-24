@@ -68,6 +68,29 @@ export async function createEntry(
     });
   }
 
+  const projectIds = Array.from(
+    new Set(
+      parsed.lines
+        .map((line) => line.projectId)
+        .filter((projectId): projectId is string => typeof projectId === 'string')
+    )
+  );
+
+  if (projectIds.length > 0) {
+    const projects = await client.project.findMany({
+      where: { organizationId, id: { in: projectIds } },
+      select: { id: true },
+    });
+
+    if (projects.length !== projectIds.length) {
+      throw new HttpProblemError({
+        status: 404,
+        title: 'PROJECT_NOT_FOUND',
+        detail: 'One or more projects referenced by the entry do not exist in this organization.',
+      });
+    }
+  }
+
   const zero = new Prisma.Decimal(0);
   const totalDebit = parsed.lines.reduce(
     (sum, line) => sum.add(line.debit),
@@ -117,6 +140,7 @@ export async function createEntry(
           accountId: line.accountId,
           debit: line.debit,
           credit: line.credit,
+          projectId: line.projectId ?? null,
         })),
       },
     },
