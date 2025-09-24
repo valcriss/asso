@@ -32,6 +32,8 @@ model Organization {
   memberPayments           MemberPayment[]
   donations                Donation[]
   donationReceiptSequences DonationReceiptSequence[]
+  projects                Project[]
+  projectPeriods          ProjectPeriod[]
 
   @@map("organization")
 }
@@ -241,18 +243,61 @@ model EntryLine {
   accountId      String       @map("account_id") @db.Uuid
   debit          Decimal      @default(0) @db.Decimal(16, 2)
   credit         Decimal      @default(0) @db.Decimal(16, 2)
-  projectId      String?      @map("project_id")
+  projectId      String?      @map("project_id") @db.Uuid
   memberId       String?      @map("member_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   entry          Entry        @relation(fields: [entryId], references: [id], onDelete: Restrict)
   account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: Restrict)
   member         Member?      @relation(fields: [memberId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, accountId], map: "entry_line_org_account_idx")
   @@index([entryId], map: "entry_line_entry_idx")
   @@map("entry_line")
+}
+
+model Project {
+  id             String          @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  code           String
+  name           String
+  description    String?
+  type           ProjectType     @default(PROJECT)
+  funder         String?
+  plannedAmount  Decimal?        @map("planned_amount") @db.Decimal(16, 2)
+  currency       String          @default("EUR")
+  startDate      DateTime?       @map("start_date")
+  endDate        DateTime?       @map("end_date")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  periods        ProjectPeriod[]
+  entryLines     EntryLine[]
+
+  @@unique([organizationId, code], map: "project_org_code_key")
+  @@index([organizationId, type], map: "project_org_type_idx")
+  @@map("project")
+}
+
+model ProjectPeriod {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  projectId      String       @map("project_id") @db.Uuid
+  label          String
+  plannedAmount  Decimal      @map("planned_amount") @db.Decimal(16, 2)
+  startDate      DateTime?    @map("start_date")
+  endDate        DateTime?    @map("end_date")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, label], map: "project_period_unique_label")
+  @@index([organizationId, projectId], map: "project_period_org_project_idx")
+  @@index([organizationId, startDate], map: "project_period_org_start_idx")
+  @@map("project_period")
 }
 
 model Member {
@@ -397,6 +442,11 @@ enum UserRole {
   TREASURER
   SECRETARY
   VIEWER
+}
+
+enum ProjectType {
+  PROJECT
+  SUBSIDY
 }
 
 enum MemberFeeAssignmentStatus {

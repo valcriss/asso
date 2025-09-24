@@ -58,6 +58,7 @@ const amountWithDefaultSchema = amountSchema
 export const entryLineInputSchema = z
   .object({
     accountId: z.string().uuid(),
+    projectId: z.string().uuid().optional(),
     debit: amountWithDefaultSchema,
     credit: amountWithDefaultSchema,
   })
