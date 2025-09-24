@@ -11,6 +11,8 @@ import {
   type ListMemberFeeAssignmentsQuery,
   updateMemberFeeAssignmentSchema,
 } from './schemas';
+import type { MemberReminderQueue } from '../../../lib/jobs/member-reminder-queue';
+import { createPendingMemberPaymentForAssignment } from '../member-payments';
 
 export type MemberFeeAssignmentClient = PrismaClient | Prisma.TransactionClient;
 
@@ -52,6 +54,7 @@ export async function getMemberFeeAssignment(
 
 export async function createMemberFeeAssignment(
   client: MemberFeeAssignmentClient,
+  queue: MemberReminderQueue,
   organizationId: string,
   input: unknown
 ) {
@@ -82,7 +85,9 @@ export async function createMemberFeeAssignment(
   };
 
   try {
-    return await client.memberFeeAssignment.create({ data });
+    const assignment = await client.memberFeeAssignment.create({ data });
+    await createPendingMemberPaymentForAssignment(client, queue, organizationId, assignment);
+    return assignment;
   } catch (error) {
     if (isUniqueAssignmentError(error)) {
       throw new HttpProblemError({
@@ -189,6 +194,7 @@ export async function deleteMemberFeeAssignment(
 
 export async function applyAutomaticAssignments(
   client: MemberFeeAssignmentClient,
+  queue: MemberReminderQueue,
   organizationId: string,
   input: unknown
 ): Promise<{ created: number }> {
@@ -270,7 +276,7 @@ export async function applyAutomaticAssignments(
 
   const existingKeys = new Set(existingAssignments.map((item) => `${item.memberId}:${item.templateId}`));
   const newKeys = new Set<string>();
-  const data: Prisma.MemberFeeAssignmentCreateManyInput[] = [];
+  const assignmentsToCreate: Prisma.MemberFeeAssignmentCreateInput[] = [];
 
   for (const template of applicableTemplates) {
     for (const member of members) {
@@ -285,10 +291,10 @@ export async function applyAutomaticAssignments(
 
       newKeys.add(key);
 
-      data.push({
-        organizationId,
-        memberId: member.id,
-        templateId: template.id,
+      assignmentsToCreate.push({
+        organization: { connect: { id: organizationId } },
+        member: { connect: { id: member.id } },
+        template: { connect: { id: template.id } },
         amount: template.amount,
         currency: template.currency ?? 'EUR',
         status: MemberFeeAssignmentStatus.PENDING,
@@ -297,19 +303,23 @@ export async function applyAutomaticAssignments(
         dueDate,
         autoAssigned: true,
         assignedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
       });
     }
   }
 
-  if (data.length === 0) {
+  if (assignmentsToCreate.length === 0) {
     return { created: 0 };
   }
 
-  const result = await client.memberFeeAssignment.createMany({ data, skipDuplicates: true });
+  let created = 0;
 
-  return { created: result.count };
+  for (const assignmentInput of assignmentsToCreate) {
+    const assignment = await client.memberFeeAssignment.create({ data: assignmentInput });
+    created += 1;
+    await createPendingMemberPaymentForAssignment(client, queue, organizationId, assignment);
+  }
+
+  return { created };
 }
 
 function assignmentNotFound(): HttpProblemError {

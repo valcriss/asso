@@ -12,6 +12,7 @@ import paginationPlugin from './plugins/pagination';
 import prismaPlugin from './plugins/prisma';
 import problemJsonPlugin from './plugins/problem-json';
 import authPlugin from './plugins/auth';
+import memberReminderPlugin from './plugins/member-reminders';
 
 dotenv.config();
 
@@ -32,6 +33,12 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32).default('dev-access-secret-change-me-please-0123456789'),
   JWT_REFRESH_SECRET: z.string().min(32).default('dev-refresh-secret-change-me-please-0123456789'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  REDIS_URL: z
+    .preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().url().optional()
+    )
+    .optional(),
 });
 
 type RawEnvConfig = {
@@ -41,6 +48,7 @@ type RawEnvConfig = {
   JWT_ACCESS_SECRET?: string;
   JWT_REFRESH_SECRET?: string;
   REFRESH_TOKEN_TTL_DAYS?: number;
+  REDIS_URL?: string;
 };
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -81,6 +89,7 @@ export async function buildServer(): Promise<FastifyInstance> {
           default: 'dev-refresh-secret-change-me-please-0123456789',
         },
         REFRESH_TOKEN_TTL_DAYS: { type: 'number', default: 30 },
+        REDIS_URL: { type: 'string', default: '' },
       },
     },
   });
@@ -91,6 +100,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(problemJsonPlugin);
   await app.register(authPlugin);
   await app.register(prismaPlugin);
+  await app.register(memberReminderPlugin);
 
   await app.register(rateLimit, {
     max: 100,
