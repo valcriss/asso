@@ -8,45 +8,49 @@ datasource db {
 }
 
 model Organization {
-  id          String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  name        String
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  fiscalYears FiscalYear[]
-  accounts    Account[]
-  journals    Journal[]
-  entries     Entry[]
-  entryLines  EntryLine[]
-  attachments Attachment[]
-  memberships UserOrgRole[]
-  refreshTokens RefreshToken[]
-  sequences   SequenceNumber[]
-  fecExports  FecExport[]
-  bankAccounts BankAccount[]
-  bankStatements BankStatement[]
-  bankTransactions BankTransaction[]
-  ofxRules     OfxRule[]
-  members      Member[]
-  membershipFeeTemplates MembershipFeeTemplate[]
-  memberFeeAssignments MemberFeeAssignment[]
-  memberPayments MemberPayment[]
+  id                       String                    @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  name                     String
+  createdAt                DateTime                  @default(now()) @map("created_at")
+  updatedAt                DateTime                  @updatedAt @map("updated_at")
+  fiscalYears              FiscalYear[]
+  accounts                 Account[]
+  journals                 Journal[]
+  entries                  Entry[]
+  entryLines               EntryLine[]
+  attachments              Attachment[]
+  memberships              UserOrgRole[]
+  refreshTokens            RefreshToken[]
+  sequences                SequenceNumber[]
+  fecExports               FecExport[]
+  bankAccounts             BankAccount[]
+  bankStatements           BankStatement[]
+  bankTransactions         BankTransaction[]
+  ofxRules                 OfxRule[]
+  members                  Member[]
+  membershipFeeTemplates   MembershipFeeTemplate[]
+  memberFeeAssignments     MemberFeeAssignment[]
+  memberPayments           MemberPayment[]
+  donations                Donation[]
+  donationReceiptSequences DonationReceiptSequence[]
 
   @@map("organization")
 }
 
 model FiscalYear {
-  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  label          String
-  startDate      DateTime     @map("start_date")
-  endDate        DateTime     @map("end_date")
-  lockedAt       DateTime?    @map("locked_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  entries        Entry[]
-  sequences      SequenceNumber[]
-  fecExports     FecExport[]
+  id                       String                    @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId           String                    @map("organization_id") @db.Uuid
+  label                    String
+  startDate                DateTime                  @map("start_date")
+  endDate                  DateTime                  @map("end_date")
+  lockedAt                 DateTime?                 @map("locked_at")
+  createdAt                DateTime                  @default(now()) @map("created_at")
+  updatedAt                DateTime                  @updatedAt @map("updated_at")
+  organization             Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entries                  Entry[]
+  sequences                SequenceNumber[]
+  fecExports               FecExport[]
+  donations                Donation[]
+  donationReceiptSequences DonationReceiptSequence[]
 
   @@unique([organizationId, label], map: "fiscal_year_org_label_key")
   @@index([organizationId, startDate], map: "fiscal_year_org_start_idx")
@@ -72,14 +76,14 @@ model Account {
 }
 
 model Journal {
-  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
+  id             String           @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
   code           String
   name           String
   type           String
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   entries        Entry[]
   sequences      SequenceNumber[]
 
@@ -89,27 +93,28 @@ model Journal {
 }
 
 model Entry {
-  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  fiscalYearId   String       @map("fiscal_year_id") @db.Uuid
-  journalId      String       @map("journal_id") @db.Uuid
-  date           DateTime
-  reference      String?      @map("ref")
-  memo           String?
-  lockedAt       DateTime?    @map("locked_at")
-  createdBy      String?      @map("created_by")
-  bankStatementId String?     @map("bank_statement_id") @db.Uuid
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  fiscalYear     FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
-  journal        Journal      @relation(fields: [journalId], references: [id], onDelete: Restrict)
-  lines          EntryLine[]
-  attachments    Attachment[]
-  bankStatement  BankStatement? @relation(fields: [bankStatementId], references: [id], onDelete: SetNull)
-  bankMatches    BankTransaction[] @relation("BankTransactionMatchedEntry")
+  id                   String                @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId       String                @map("organization_id") @db.Uuid
+  fiscalYearId         String                @map("fiscal_year_id") @db.Uuid
+  journalId            String                @map("journal_id") @db.Uuid
+  date                 DateTime
+  reference            String?               @map("ref")
+  memo                 String?
+  lockedAt             DateTime?             @map("locked_at")
+  createdBy            String?               @map("created_by")
+  bankStatementId      String?               @map("bank_statement_id") @db.Uuid
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiscalYear           FiscalYear            @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  journal              Journal               @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  lines                EntryLine[]
+  attachments          Attachment[]
+  bankStatement        BankStatement?        @relation(fields: [bankStatementId], references: [id], onDelete: SetNull)
+  bankMatches          BankTransaction[]     @relation("BankTransactionMatchedEntry")
   memberFeeAssignments MemberFeeAssignment[]
-  memberPayments MemberPayment[]
+  memberPayments       MemberPayment[]
+  donations            Donation[]
 
   @@index([organizationId, date], map: "entry_org_date_idx")
   @@index([organizationId, fiscalYearId], map: "entry_org_fiscal_year_idx")
@@ -119,16 +124,16 @@ model Entry {
 }
 
 model BankAccount {
-  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  accountId      String       @map("account_id") @db.Uuid @unique
+  id             String            @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  accountId      String            @unique @map("account_id") @db.Uuid
   name           String
   iban           String
   bic            String?
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  account        Account           @relation(fields: [accountId], references: [id], onDelete: Restrict)
   statements     BankStatement[]
   transactions   BankTransaction[]
   ofxRules       OfxRule[]
@@ -140,16 +145,16 @@ model BankAccount {
 }
 
 model BankStatement {
-  id             String        @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String        @map("organization_id") @db.Uuid
-  bankAccountId  String        @map("bank_account_id") @db.Uuid
-  statementDate  DateTime      @map("statement_date")
-  openingBalance Decimal       @map("opening_balance") @db.Decimal(16, 2)
-  closingBalance Decimal       @map("closing_balance") @db.Decimal(16, 2)
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  bankAccount    BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  id             String            @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  bankAccountId  String            @map("bank_account_id") @db.Uuid
+  statementDate  DateTime          @map("statement_date")
+  openingBalance Decimal           @map("opening_balance") @db.Decimal(16, 2)
+  closingBalance Decimal           @map("closing_balance") @db.Decimal(16, 2)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bankAccount    BankAccount       @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   entries        Entry[]
   transactions   BankTransaction[]
 
@@ -159,23 +164,23 @@ model BankStatement {
 }
 
 model BankTransaction {
-  id              String        @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId  String        @map("organization_id") @db.Uuid
-  bankAccountId   String        @map("bank_account_id") @db.Uuid
-  bankStatementId String?       @map("bank_statement_id") @db.Uuid
-  fitId           String        @map("fitid")
-  valueDate       DateTime      @map("value_date")
-  amount          Decimal       @db.Decimal(16, 2)
-  rawLabel        String        @map("raw_label")
-  normalizedLabel String?       @map("normalized_label")
+  id              String         @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId  String         @map("organization_id") @db.Uuid
+  bankAccountId   String         @map("bank_account_id") @db.Uuid
+  bankStatementId String?        @map("bank_statement_id") @db.Uuid
+  fitId           String         @map("fitid")
+  valueDate       DateTime       @map("value_date")
+  amount          Decimal        @db.Decimal(16, 2)
+  rawLabel        String         @map("raw_label")
+  normalizedLabel String?        @map("normalized_label")
   memo            String?
-  matchedEntryId  String?       @map("matched_entry_id") @db.Uuid
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  bankAccount     BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  matchedEntryId  String?        @map("matched_entry_id") @db.Uuid
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bankAccount     BankAccount    @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   bankStatement   BankStatement? @relation(fields: [bankStatementId], references: [id], onDelete: SetNull)
-  matchedEntry    Entry?        @relation("BankTransactionMatchedEntry", fields: [matchedEntryId], references: [id], onDelete: SetNull)
+  matchedEntry    Entry?         @relation("BankTransactionMatchedEntry", fields: [matchedEntryId], references: [id], onDelete: SetNull)
 
   @@unique([bankAccountId, fitId, amount, valueDate], map: "bank_transaction_dedup_key")
   @@index([organizationId, bankAccountId, valueDate], map: "bank_transaction_org_account_date_idx")
@@ -251,18 +256,18 @@ model EntryLine {
 }
 
 model Member {
-  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  firstName      String       @map("first_name")
-  lastName       String       @map("last_name")
+  id             String                @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  firstName      String                @map("first_name")
+  lastName       String                @map("last_name")
   email          String
-  membershipType String       @map("membership_type")
-  joinedAt       DateTime?    @map("joined_at")
-  leftAt         DateTime?    @map("left_at")
-  rgpdConsentAt  DateTime?    @map("rgpd_consent_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  membershipType String                @map("membership_type")
+  joinedAt       DateTime?             @map("joined_at")
+  leftAt         DateTime?             @map("left_at")
+  rgpdConsentAt  DateTime?             @map("rgpd_consent_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   feeAssignments MemberFeeAssignment[]
   entryLines     EntryLine[]
   payments       MemberPayment[]
@@ -274,18 +279,18 @@ model Member {
 }
 
 model MembershipFeeTemplate {
-  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
+  id             String                @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
   label          String
-  amount         Decimal      @db.Decimal(16, 2)
-  currency       String       @default("EUR")
-  membershipType String?      @map("membership_type")
-  validFrom      DateTime     @map("valid_from")
-  validUntil     DateTime?    @map("valid_until")
-  isActive       Boolean      @default(true) @map("is_active")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  amount         Decimal               @db.Decimal(16, 2)
+  currency       String                @default("EUR")
+  membershipType String?               @map("membership_type")
+  validFrom      DateTime              @map("valid_from")
+  validUntil     DateTime?             @map("valid_until")
+  isActive       Boolean               @default(true) @map("is_active")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   assignments    MemberFeeAssignment[]
 
   @@index([organizationId, isActive], map: "membership_fee_template_org_active_idx")
@@ -295,26 +300,26 @@ model MembershipFeeTemplate {
 }
 
 model MemberFeeAssignment {
-  id             String                     @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String                     @map("organization_id") @db.Uuid
-  memberId       String                     @map("member_id") @db.Uuid
-  templateId     String                     @map("template_id") @db.Uuid
-  amount         Decimal                    @db.Decimal(16, 2)
-  currency       String                     @default("EUR")
-  status         MemberFeeAssignmentStatus  @default(PENDING)
-  periodStart    DateTime                   @map("period_start")
-  periodEnd      DateTime?                  @map("period_end")
-  dueDate        DateTime?                  @map("due_date")
-  assignedAt     DateTime                   @default(now()) @map("assigned_at")
-  autoAssigned   Boolean                    @default(false) @map("auto_assigned")
-  entryId        String?                    @map("entry_id") @db.Uuid
-  draftInvoiceId String?                    @map("draft_invoice_id")
-  createdAt      DateTime                   @default(now()) @map("created_at")
-  updatedAt      DateTime                   @updatedAt @map("updated_at")
-  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  member         Member                     @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  template       MembershipFeeTemplate      @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  entry          Entry?                     @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  id             String                    @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String                    @map("organization_id") @db.Uuid
+  memberId       String                    @map("member_id") @db.Uuid
+  templateId     String                    @map("template_id") @db.Uuid
+  amount         Decimal                   @db.Decimal(16, 2)
+  currency       String                    @default("EUR")
+  status         MemberFeeAssignmentStatus @default(PENDING)
+  periodStart    DateTime                  @map("period_start")
+  periodEnd      DateTime?                 @map("period_end")
+  dueDate        DateTime?                 @map("due_date")
+  assignedAt     DateTime                  @default(now()) @map("assigned_at")
+  autoAssigned   Boolean                   @default(false) @map("auto_assigned")
+  entryId        String?                   @map("entry_id") @db.Uuid
+  draftInvoiceId String?                   @map("draft_invoice_id")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
+  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member         Member                    @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  template       MembershipFeeTemplate     @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  entry          Entry?                    @relation(fields: [entryId], references: [id], onDelete: SetNull)
   payments       MemberPayment[]
 
   @@unique([organizationId, memberId, templateId, periodStart], map: "member_fee_assignment_unique_period")
@@ -325,17 +330,17 @@ model MemberFeeAssignment {
 }
 
 model Attachment {
-  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  entryId        String       @map("entry_id") @db.Uuid
+  id             String          @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  entryId        String          @map("entry_id") @db.Uuid
   url            String
   filename       String
   mime           String
   sha256         String
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  entry          Entry        @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entry          Entry           @relation(fields: [entryId], references: [id], onDelete: Cascade)
   memberPayments MemberPayment[] @relation("MemberPaymentSupportingDocument")
 
   @@index([organizationId, entryId], map: "attachment_org_entry_idx")
@@ -343,11 +348,11 @@ model Attachment {
 }
 
 model User {
-  id            String          @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  email         String          @unique
-  passwordHash  String          @map("password_hash")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  id            String         @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
   roles         UserOrgRole[]
   refreshTokens RefreshToken[]
 
@@ -370,17 +375,17 @@ model UserOrgRole {
 }
 
 model RefreshToken {
-  id                String        @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  userId            String        @map("user_id") @db.Uuid
-  organizationId    String        @map("organization_id") @db.Uuid
-  expiresAt         DateTime      @map("expires_at")
-  revokedAt         DateTime?     @map("revoked_at")
-  replacedByTokenId String?       @map("replaced_by_token_id") @db.Uuid
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  replacedBy        RefreshToken? @relation("RefreshTokenReplacement", fields: [replacedByTokenId], references: [id])
+  id                String         @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  userId            String         @map("user_id") @db.Uuid
+  organizationId    String         @map("organization_id") @db.Uuid
+  expiresAt         DateTime       @map("expires_at")
+  revokedAt         DateTime?      @map("revoked_at")
+  replacedByTokenId String?        @map("replaced_by_token_id") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  replacedBy        RefreshToken?  @relation("RefreshTokenReplacement", fields: [replacedByTokenId], references: [id])
   replacements      RefreshToken[] @relation("RefreshTokenReplacement")
 
   @@index([userId, organizationId], map: "refresh_token_user_org_idx")
@@ -408,26 +413,69 @@ enum MemberPaymentStatus {
 }
 
 model MemberPayment {
-  id                    String               @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
-  organizationId        String               @map("organization_id") @db.Uuid
-  assignmentId          String               @map("assignment_id") @db.Uuid @unique
-  memberId              String               @map("member_id") @db.Uuid
-  status                MemberPaymentStatus  @default(PENDING)
-  amount                Decimal              @db.Decimal(16, 2)
-  currency              String               @default("EUR")
-  dueDate               DateTime?            @map("due_date")
-  paidAt                DateTime?            @map("paid_at")
-  entryId               String?              @map("entry_id") @db.Uuid
-  supportingDocumentId  String?              @map("supporting_document_id") @db.Uuid
-  createdAt             DateTime             @default(now()) @map("created_at")
-  updatedAt             DateTime             @updatedAt @map("updated_at")
-  organization          Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  assignment            MemberFeeAssignment  @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  member                Member               @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  entry                 Entry?               @relation(fields: [entryId], references: [id], onDelete: SetNull)
-  supportingDocument    Attachment?          @relation("MemberPaymentSupportingDocument", fields: [supportingDocumentId], references: [id], onDelete: SetNull)
+  id                   String              @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId       String              @map("organization_id") @db.Uuid
+  assignmentId         String              @unique @map("assignment_id") @db.Uuid
+  memberId             String              @map("member_id") @db.Uuid
+  status               MemberPaymentStatus @default(PENDING)
+  amount               Decimal             @db.Decimal(16, 2)
+  currency             String              @default("EUR")
+  dueDate              DateTime?           @map("due_date")
+  paidAt               DateTime?           @map("paid_at")
+  entryId              String?             @map("entry_id") @db.Uuid
+  supportingDocumentId String?             @map("supporting_document_id") @db.Uuid
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assignment           MemberFeeAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  member               Member              @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  entry                Entry?              @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  supportingDocument   Attachment?         @relation("MemberPaymentSupportingDocument", fields: [supportingDocumentId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, status], map: "member_payment_org_status_idx")
   @@index([organizationId, dueDate], map: "member_payment_org_due_date_idx")
   @@map("member_payment")
+}
+
+model DonationReceiptSequence {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  fiscalYearId   String       @map("fiscal_year_id") @db.Uuid
+  nextValue      Int          @default(1) @map("next_value")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, fiscalYearId], map: "donation_receipt_sequence_org_year_key")
+  @@index([organizationId], map: "donation_receipt_sequence_org_idx")
+  @@map("donation_receipt_sequence")
+}
+
+model Donation {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  fiscalYearId   String       @map("fiscal_year_id") @db.Uuid
+  entryId        String       @map("entry_id") @db.Uuid
+  donorName      String       @map("donor_name")
+  donorEmail     String?      @map("donor_email")
+  donorAddress   String?      @map("donor_address")
+  amount         Decimal      @db.Decimal(16, 2)
+  currency       String       @default("EUR")
+  receiptNumber  String       @map("receipt_number")
+  receiptHash    String       @map("receipt_hash")
+  receiptUrl     String       @map("receipt_url")
+  receivedAt     DateTime     @map("received_at")
+  issuedAt       DateTime     @map("issued_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  entry          Entry        @relation(fields: [entryId], references: [id], onDelete: Restrict)
+
+  @@unique([entryId], map: "donation_entry_id_key")
+  @@unique([organizationId, fiscalYearId, receiptNumber], map: "donation_receipt_unique")
+  @@index([organizationId, fiscalYearId], map: "donation_org_fiscal_year_idx")
+  @@index([organizationId, receivedAt], map: "donation_org_received_idx")
+  @@map("donation")
 }

@@ -13,6 +13,7 @@ import prismaPlugin from './plugins/prisma';
 import problemJsonPlugin from './plugins/problem-json';
 import authPlugin from './plugins/auth';
 import memberReminderPlugin from './plugins/member-reminders';
+import objectStoragePlugin from './plugins/object-storage';
 
 dotenv.config();
 
@@ -39,6 +40,22 @@ const envSchema = z.object({
       z.string().url().optional()
     )
     .optional(),
+  S3_ACCESS_KEY_ID: z.string().default('local-access-key'),
+  S3_SECRET_ACCESS_KEY: z.string().default('local-secret-key'),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().default('local-bucket'),
+  S3_ENDPOINT: z
+    .preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().url().optional()
+    )
+    .optional(),
+  S3_PUBLIC_URL: z
+    .preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().url().optional()
+    )
+    .optional(),
 });
 
 type RawEnvConfig = {
@@ -49,6 +66,12 @@ type RawEnvConfig = {
   JWT_REFRESH_SECRET?: string;
   REFRESH_TOKEN_TTL_DAYS?: number;
   REDIS_URL?: string;
+  S3_ACCESS_KEY_ID?: string;
+  S3_SECRET_ACCESS_KEY?: string;
+  S3_REGION?: string;
+  S3_BUCKET?: string;
+  S3_ENDPOINT?: string;
+  S3_PUBLIC_URL?: string;
 };
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -90,6 +113,12 @@ export async function buildServer(): Promise<FastifyInstance> {
         },
         REFRESH_TOKEN_TTL_DAYS: { type: 'number', default: 30 },
         REDIS_URL: { type: 'string', default: '' },
+        S3_ACCESS_KEY_ID: { type: 'string', default: 'local-access-key' },
+        S3_SECRET_ACCESS_KEY: { type: 'string', default: 'local-secret-key' },
+        S3_REGION: { type: 'string', default: 'us-east-1' },
+        S3_BUCKET: { type: 'string', default: 'local-bucket' },
+        S3_ENDPOINT: { type: 'string', default: '' },
+        S3_PUBLIC_URL: { type: 'string', default: '' },
       },
     },
   });
@@ -101,6 +130,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(authPlugin);
   await app.register(prismaPlugin);
   await app.register(memberReminderPlugin);
+  await app.register(objectStoragePlugin);
 
   await app.register(rateLimit, {
     max: 100,
