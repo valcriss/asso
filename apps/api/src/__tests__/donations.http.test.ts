@@ -20,6 +20,7 @@ interface StoredObject {
   key: string;
   body: Buffer;
   contentType: string;
+  versionId: string;
 }
 
 let app: FastifyInstance;
@@ -50,8 +51,9 @@ beforeAll(async () => {
   const stubStorage: ObjectStorage = {
     async putObject({ key, body, contentType }) {
       const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
-      storedObjects.push({ key, body: buffer, contentType });
-      return { url: `https://cdn.example.org/storage/${key}` };
+      const versionId = `v${storedObjects.length + 1}`;
+      storedObjects.push({ key, body: buffer, contentType, versionId });
+      return { key, url: `https://cdn.example.org/storage/${key}`, versionId };
     },
     getPublicUrl(key: string) {
       return `https://cdn.example.org/storage/${key}`;

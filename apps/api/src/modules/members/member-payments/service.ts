@@ -11,8 +11,6 @@ import type { MemberReminderQueue } from '../../../lib/jobs/member-reminder-queu
 import {
   linkPaymentJustificationSchema,
   recordMemberPaymentSchema,
-  type LinkPaymentJustificationInput,
-  type RecordMemberPaymentInput,
 } from './schemas';
 
 const BEFORE_DUE_REMINDER_HOURS = 72;
@@ -162,6 +160,14 @@ export async function linkMemberPaymentJustification(
       status: 404,
       title: 'ATTACHMENT_NOT_FOUND',
       detail: 'The specified attachment was not found for this organization.',
+    });
+  }
+
+  if (!attachment.entryId) {
+    throw new HttpProblemError({
+      status: 422,
+      title: 'ATTACHMENT_ENTRY_REQUIRED',
+      detail: 'The attachment must be linked to an accounting entry before it can be used as supporting evidence.',
     });
   }
 

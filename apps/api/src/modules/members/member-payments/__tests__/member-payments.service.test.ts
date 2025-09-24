@@ -116,10 +116,13 @@ describe('member payments service', () => {
         data: {
           organizationId: organization.id,
           entryId: entryRecord.id,
+          storageKey: 'attachments/test/doc.pdf',
           url: 'https://cdn.example.org/doc.pdf',
           filename: 'doc.pdf',
           mime: 'application/pdf',
           sha256: 'abc123',
+          byteSize: 2048,
+          versionId: 'v1',
         },
       });
 

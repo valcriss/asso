@@ -275,6 +275,7 @@ model Project {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   periods        ProjectPeriod[]
   entryLines     EntryLine[]
+  attachments    Attachment[]
 
   @@unique([organizationId, code], map: "project_org_code_key")
   @@index([organizationId, type], map: "project_org_type_idx")
@@ -377,18 +378,24 @@ model MemberFeeAssignment {
 model Attachment {
   id             String          @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
   organizationId String          @map("organization_id") @db.Uuid
-  entryId        String          @map("entry_id") @db.Uuid
+  entryId        String?         @map("entry_id") @db.Uuid
+  projectId      String?         @map("project_id") @db.Uuid
+  storageKey     String          @map("storage_key")
   url            String
   filename       String
   mime           String
   sha256         String
+  versionId      String?         @map("version_id")
+  byteSize       Int             @map("byte_size")
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  entry          Entry           @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entry          Entry?          @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   memberPayments MemberPayment[] @relation("MemberPaymentSupportingDocument")
 
   @@index([organizationId, entryId], map: "attachment_org_entry_idx")
+  @@index([organizationId, projectId], map: "attachment_org_project_idx")
   @@map("attachment")
 }
 
