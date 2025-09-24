@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import autoload from '@fastify/autoload';
 import env from '@fastify/env';
 import rateLimit from '@fastify/rate-limit';
+import multipart from '@fastify/multipart';
 import dotenv from 'dotenv';
 import pino from 'pino';
 import { z } from 'zod';
@@ -14,6 +15,7 @@ import problemJsonPlugin from './plugins/problem-json';
 import authPlugin from './plugins/auth';
 import memberReminderPlugin from './plugins/member-reminders';
 import objectStoragePlugin from './plugins/object-storage';
+import antivirusPlugin from './plugins/antivirus';
 
 dotenv.config();
 
@@ -56,6 +58,15 @@ const envSchema = z.object({
       z.string().url().optional()
     )
     .optional(),
+  CLAMAV_ENABLED: z.coerce.boolean().default(false),
+  CLAMAV_HOST: z
+    .preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().optional()
+    )
+    .optional(),
+  CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
+  CLAMAV_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
 });
 
 type RawEnvConfig = {
@@ -72,6 +83,10 @@ type RawEnvConfig = {
   S3_BUCKET?: string;
   S3_ENDPOINT?: string;
   S3_PUBLIC_URL?: string;
+  CLAMAV_ENABLED?: boolean | string;
+  CLAMAV_HOST?: string;
+  CLAMAV_PORT?: number | string;
+  CLAMAV_TIMEOUT_MS?: number | string;
 };
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -119,6 +134,10 @@ export async function buildServer(): Promise<FastifyInstance> {
         S3_BUCKET: { type: 'string', default: 'local-bucket' },
         S3_ENDPOINT: { type: 'string', default: '' },
         S3_PUBLIC_URL: { type: 'string', default: '' },
+        CLAMAV_ENABLED: { type: 'boolean', default: false },
+        CLAMAV_HOST: { type: 'string', default: '' },
+        CLAMAV_PORT: { type: 'number', default: 3310 },
+        CLAMAV_TIMEOUT_MS: { type: 'number', default: 5000 },
       },
     },
   });
@@ -126,10 +145,19 @@ export async function buildServer(): Promise<FastifyInstance> {
   const config = envSchema.parse(app.envConfig);
   app.decorate('config', config);
 
+  await app.register(multipart, {
+    attachFieldsToBody: false,
+    limits: {
+      fileSize: 20 * 1024 * 1024,
+      fields: 20,
+      files: 1,
+    },
+  });
   await app.register(problemJsonPlugin);
   await app.register(authPlugin);
   await app.register(prismaPlugin);
   await app.register(memberReminderPlugin);
+  await app.register(antivirusPlugin);
   await app.register(objectStoragePlugin);
 
   await app.register(rateLimit, {

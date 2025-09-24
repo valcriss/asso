@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { UserRole } from '@prisma/client';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
 import { HttpProblemError } from '../lib/problem-details';
 import {
   generateFecReport,
@@ -20,6 +20,7 @@ const organizationParamsSchema = z.object({
 const reportQuerySchema = z.object({
   fiscalYearId: z.string().uuid(),
   format: z.enum(['json', 'csv', 'pdf']).default('json'),
+  watermark: z.enum(['none', 'copy']).default('none'),
 });
 
 const fecQuerySchema = z.object({
@@ -61,7 +62,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
 
-      const pdf = await formatTrialBalancePdf(report);
+      const watermarkText = query.watermark === 'copy' ? 'Copy' : undefined;
+      const pdf = await formatTrialBalancePdf(report, { watermarkText });
       reply
         .type('application/pdf')
         .header(
@@ -98,7 +100,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
 
-      const pdf = await formatLedgerPdf(report);
+      const watermarkText = query.watermark === 'copy' ? 'Copy' : undefined;
+      const pdf = await formatLedgerPdf(report, { watermarkText });
       reply
         .type('application/pdf')
         .header(
@@ -135,7 +138,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
 
-      const pdf = await formatIncomeStatementPdf(report);
+      const watermarkText = query.watermark === 'copy' ? 'Copy' : undefined;
+      const pdf = await formatIncomeStatementPdf(report, { watermarkText });
       reply
         .type('application/pdf')
         .header(
@@ -203,7 +207,10 @@ function formatTrialBalanceCsv(report: TrialBalanceReport): string {
   return [header, ...lines].join('\n');
 }
 
-async function formatTrialBalancePdf(report: TrialBalanceReport): Promise<Uint8Array> {
+async function formatTrialBalancePdf(
+  report: TrialBalanceReport,
+  options: PdfFormatOptions = {}
+): Promise<Uint8Array> {
   const rows = report.lines.map((line) => [
     line.code,
     line.name,
@@ -218,7 +225,12 @@ async function formatTrialBalancePdf(report: TrialBalanceReport): Promise<Uint8A
     formatAmount(report.totals.credit),
     formatAmount(report.totals.balance),
   ]);
-  return createTablePdf(`Trial Balance - ${report.fiscalYear.label}`, ['Code', 'Name', 'Debit', 'Credit', 'Balance'], rows);
+  return createTablePdf(
+    `Trial Balance - ${report.fiscalYear.label}`,
+    ['Code', 'Name', 'Debit', 'Credit', 'Balance'],
+    rows,
+    options
+  );
 }
 
 function formatLedgerCsv(report: LedgerReport): string {
@@ -244,7 +256,7 @@ function formatLedgerCsv(report: LedgerReport): string {
   return [header, ...rows].join('\n');
 }
 
-async function formatLedgerPdf(report: LedgerReport): Promise<Uint8Array> {
+async function formatLedgerPdf(report: LedgerReport, options: PdfFormatOptions = {}): Promise<Uint8Array> {
   const rows: string[][] = [];
   for (const account of report.accounts) {
     rows.push([`${account.code} - ${account.name}`, '', '', '', '', '', '', '', '']);
@@ -265,7 +277,8 @@ async function formatLedgerPdf(report: LedgerReport): Promise<Uint8Array> {
   return createTablePdf(
     `General Ledger - ${report.fiscalYear.label}`,
     ['Account', 'Date', 'Journal', 'Reference', 'Memo', 'Debit', 'Credit', 'Balance', ''],
-    rows
+    rows,
+    options
   );
 }
 
@@ -288,7 +301,10 @@ function formatIncomeStatementCsv(report: IncomeStatementReport): string {
   return [header, ...rows].join('\n');
 }
 
-async function formatIncomeStatementPdf(report: IncomeStatementReport): Promise<Uint8Array> {
+async function formatIncomeStatementPdf(
+  report: IncomeStatementReport,
+  options: PdfFormatOptions = {}
+): Promise<Uint8Array> {
   const rows = report.rows.map((row) => [
     row.code,
     row.name,
@@ -304,13 +320,20 @@ async function formatIncomeStatementPdf(report: IncomeStatementReport): Promise<
   return createTablePdf(
     `Income Statement - ${report.fiscalYear.label}`,
     ['Code', 'Name', 'Type', 'Debit', 'Credit', 'Balance', 'Result'],
-    rows
+    rows,
+    options
   );
 }
 
-async function createTablePdf(title: string, headers: string[], rows: string[][]): Promise<Uint8Array> {
+async function createTablePdf(
+  title: string,
+  headers: string[],
+  rows: string[][],
+  options: PdfFormatOptions = {}
+): Promise<Uint8Array> {
   const document = await PDFDocument.create();
   const font = await document.embedFont(StandardFonts.Helvetica);
+  const watermarkFont = options.watermarkText ? await document.embedFont(StandardFonts.HelveticaBold) : null;
   let page = document.addPage();
   const margin = 40;
   let y = page.getHeight() - margin;
@@ -333,11 +356,41 @@ async function createTablePdf(title: string, headers: string[], rows: string[][]
     drawText(row.join(' | '), 10);
   }
 
+  if (options.watermarkText && watermarkFont) {
+    applyWatermark(document, options.watermarkText, watermarkFont);
+  }
+
   return document.save();
 }
 
 function formatAmount(value: number): string {
   return value.toFixed(2);
+}
+
+interface PdfFormatOptions {
+  watermarkText?: string;
+}
+
+function applyWatermark(document: PDFDocument, text: string, font: import('pdf-lib').PDFFont): void {
+  const pages = document.getPages();
+
+  for (const page of pages) {
+    const { width, height } = page.getSize();
+    const fontSize = Math.min(width, height) / 6;
+    const textWidth = font.widthOfTextAtSize(text, fontSize);
+    const x = (width - textWidth) / 2;
+    const y = height / 2;
+
+    page.drawText(text, {
+      x,
+      y,
+      size: fontSize,
+      font,
+      color: rgb(0.85, 0.2, 0.2),
+      rotate: degrees(45),
+      opacity: 0.15,
+    });
+  }
 }
 
 export default reportsRoutes;

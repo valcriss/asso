@@ -1,10 +1,9 @@
-import { Prisma, type PrismaClient, ProjectType } from '@prisma/client';
+import { Prisma, type PrismaClient, ProjectType, type ProjectPeriod } from '@prisma/client';
 import { HttpProblemError } from '../../lib/problem-details';
 import {
   createProjectInputSchema,
   listProjectsQuerySchema,
   projectExportQuerySchema,
-  projectVarianceQuerySchema,
   type CreateProjectInput,
   type ListProjectsQuery,
   type ProjectExportQuery,
@@ -208,7 +207,7 @@ export async function updateProject(
 ): Promise<ProjectSummary> {
   const parsed = updateProjectInputSchema.parse(input) as UpdateProjectInput;
 
-  return client.$transaction(async (tx) => {
+  return withProjectTransaction(client, async (tx) => {
     const existing = await fetchProjectOrThrow(tx, organizationId, projectId);
 
     const data: Prisma.ProjectUpdateInput = {};
@@ -329,11 +328,15 @@ export async function exportProjectJustification(
   }
 
   const entryFilter: Prisma.EntryWhereInput = {};
+  const dateFilter: Prisma.DateTimeFilter = {};
   if (period?.startDate) {
-    entryFilter.date = { ...(entryFilter.date ?? {}), gte: period.startDate };
+    dateFilter.gte = period.startDate;
   }
   if (period?.endDate) {
-    entryFilter.date = { ...(entryFilter.date ?? {}), lte: period.endDate };
+    dateFilter.lte = period.endDate;
+  }
+  if (Object.keys(dateFilter).length > 0) {
+    entryFilter.date = dateFilter;
   }
 
   const where: Prisma.EntryLineWhereInput = {
@@ -378,7 +381,7 @@ export async function exportProjectJustification(
     totalCredit = totalCredit.add(credit);
 
     const net = debit.sub(credit);
-    const entryDate = line.entry?.date ? toIsoDate(line.entry.date) : '';
+    const entryDate = toIsoDate(line.entry?.date) ?? '';
     const journalLabel = line.entry?.journal
       ? `${line.entry.journal.code} - ${line.entry.journal.name}`
       : '';
@@ -717,7 +720,7 @@ async function syncProjectPeriods(
   }
 }
 
-function comparePeriods(a: Prisma.ProjectPeriod, b: Prisma.ProjectPeriod): number {
+function comparePeriods(a: ProjectPeriod, b: ProjectPeriod): number {
   if (a.startDate && b.startDate) {
     const diff = a.startDate.getTime() - b.startDate.getTime();
     if (diff !== 0) {
@@ -777,6 +780,21 @@ function projectNotFoundError(): HttpProblemError {
     title: 'PROJECT_NOT_FOUND',
     detail: 'The requested project does not exist for this organization.',
   });
+}
+
+function hasTransactionCapability(client: ProjectClient): client is PrismaClient {
+  return typeof (client as PrismaClient).$transaction === 'function';
+}
+
+function withProjectTransaction<T>(
+  client: ProjectClient,
+  handler: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  if (hasTransactionCapability(client)) {
+    return client.$transaction(handler);
+  }
+
+  return handler(client as Prisma.TransactionClient);
 }
 
 function isUniqueViolation(error: unknown, constraint: string): boolean {

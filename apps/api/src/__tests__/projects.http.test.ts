@@ -199,10 +199,13 @@ describe('projects HTTP routes', () => {
         data: {
           organizationId,
           entryId: entry.body.data.id,
+          storageKey: 'attachments/test/invoice.pdf',
           url: 'https://files.example.org/invoice.pdf',
           filename: 'invoice.pdf',
           mime: 'application/pdf',
           sha256: 'abc123',
+          byteSize: 1234,
+          versionId: 'v1',
         },
       });
     });

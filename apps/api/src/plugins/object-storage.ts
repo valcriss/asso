@@ -9,7 +9,9 @@ export interface PutObjectParams {
 }
 
 export interface PutObjectResult {
+  key: string;
   url: string;
+  versionId?: string;
 }
 
 export interface ObjectStorage {
@@ -61,7 +63,7 @@ const objectStoragePlugin: FastifyPluginAsync = fp(async (fastify) => {
 
   const storage: ObjectStorage = {
     async putObject({ key, body, contentType }: PutObjectParams): Promise<PutObjectResult> {
-      await s3Client.send(
+      const response = await s3Client.send(
         new PutObjectCommand({
           Bucket: S3_BUCKET,
           Key: key,
@@ -70,7 +72,11 @@ const objectStoragePlugin: FastifyPluginAsync = fp(async (fastify) => {
         })
       );
 
-      return { url: buildObjectUrl(key) };
+      return {
+        key,
+        url: buildObjectUrl(key),
+        versionId: response.VersionId ?? undefined,
+      };
     },
     getPublicUrl(key: string): string {
       return buildObjectUrl(key);

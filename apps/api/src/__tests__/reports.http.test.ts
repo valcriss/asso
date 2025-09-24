@@ -92,6 +92,17 @@ describe('accounting reports HTTP routes', () => {
     expect(pdfResponse.headers['content-type']).toBe('application/pdf');
     const pdfBuffer = pdfResponse.body as Buffer;
     expect(pdfBuffer.subarray(0, 4).toString()).toBe('%PDF');
+
+    const watermarkedResponse = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/reports/balance`)
+      .query({ fiscalYearId: fixtures.fiscalYear.id, format: 'pdf', watermark: 'copy' })
+      .set('Authorization', `Bearer ${accessToken}`)
+      .buffer(true)
+      .parse(binaryParser);
+
+    expect(watermarkedResponse.statusCode).toBe(200);
+    const watermarkedPdf = watermarkedResponse.body as Buffer;
+    expect(watermarkedPdf.toString('latin1')).toContain('Copy');
   });
 
   it('returns the general ledger with running balances and exports CSV', async () => {
