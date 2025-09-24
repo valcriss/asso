@@ -29,6 +29,7 @@ model Organization {
   members      Member[]
   membershipFeeTemplates MembershipFeeTemplate[]
   memberFeeAssignments MemberFeeAssignment[]
+  memberPayments MemberPayment[]
 
   @@map("organization")
 }
@@ -108,6 +109,7 @@ model Entry {
   bankStatement  BankStatement? @relation(fields: [bankStatementId], references: [id], onDelete: SetNull)
   bankMatches    BankTransaction[] @relation("BankTransactionMatchedEntry")
   memberFeeAssignments MemberFeeAssignment[]
+  memberPayments MemberPayment[]
 
   @@index([organizationId, date], map: "entry_org_date_idx")
   @@index([organizationId, fiscalYearId], map: "entry_org_fiscal_year_idx")
@@ -263,6 +265,7 @@ model Member {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   feeAssignments MemberFeeAssignment[]
   entryLines     EntryLine[]
+  payments       MemberPayment[]
 
   @@unique([organizationId, email], map: "member_org_email_key")
   @@index([organizationId, membershipType], map: "member_org_type_idx")
@@ -312,6 +315,7 @@ model MemberFeeAssignment {
   member         Member                     @relation(fields: [memberId], references: [id], onDelete: Restrict)
   template       MembershipFeeTemplate      @relation(fields: [templateId], references: [id], onDelete: Restrict)
   entry          Entry?                     @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  payments       MemberPayment[]
 
   @@unique([organizationId, memberId, templateId, periodStart], map: "member_fee_assignment_unique_period")
   @@index([organizationId, memberId], map: "member_fee_assignment_org_member_idx")
@@ -332,6 +336,7 @@ model Attachment {
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   entry          Entry        @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  memberPayments MemberPayment[] @relation("MemberPaymentSupportingDocument")
 
   @@index([organizationId, entryId], map: "attachment_org_entry_idx")
   @@map("attachment")
@@ -394,4 +399,35 @@ enum MemberFeeAssignmentStatus {
   INVOICED
   PAID
   CANCELLED
+}
+
+enum MemberPaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model MemberPayment {
+  id                    String               @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId        String               @map("organization_id") @db.Uuid
+  assignmentId          String               @map("assignment_id") @db.Uuid @unique
+  memberId              String               @map("member_id") @db.Uuid
+  status                MemberPaymentStatus  @default(PENDING)
+  amount                Decimal              @db.Decimal(16, 2)
+  currency              String               @default("EUR")
+  dueDate               DateTime?            @map("due_date")
+  paidAt                DateTime?            @map("paid_at")
+  entryId               String?              @map("entry_id") @db.Uuid
+  supportingDocumentId  String?              @map("supporting_document_id") @db.Uuid
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+  organization          Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assignment            MemberFeeAssignment  @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  member                Member               @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  entry                 Entry?               @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  supportingDocument    Attachment?          @relation("MemberPaymentSupportingDocument", fields: [supportingDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status], map: "member_payment_org_status_idx")
+  @@index([organizationId, dueDate], map: "member_payment_org_due_date_idx")
+  @@map("member_payment")
 }

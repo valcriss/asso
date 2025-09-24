@@ -16,6 +16,9 @@ import {
   listMemberFeeAssignments,
   listMembers,
   listMembershipFeeTemplates,
+  linkMemberPaymentJustification,
+  markMemberPaymentAsOverdue,
+  markMemberPaymentAsPaid,
   updateMember,
   updateMemberFeeAssignment,
   updateMembershipFeeTemplate,
@@ -36,6 +39,10 @@ const templateParamsSchema = organizationParamsSchema.extend({
 
 const assignmentParamsSchema = organizationParamsSchema.extend({
   assignmentId: z.string().uuid(),
+});
+
+const paymentParamsSchema = organizationParamsSchema.extend({
+  paymentId: z.string().uuid(),
 });
 
 const membersRoutes: FastifyPluginAsync = async (fastify) => {
@@ -185,7 +192,12 @@ const membersRoutes: FastifyPluginAsync = async (fastify) => {
       const { orgId } = organizationParamsSchema.parse(request.params);
       ensureOrganizationAccess(request.user?.organizationId, orgId);
 
-      const assignment = await createMemberFeeAssignment(request.prisma, orgId, request.body);
+      const assignment = await createMemberFeeAssignment(
+        request.prisma,
+        fastify.memberReminderQueue,
+        orgId,
+        request.body
+      );
       reply.status(201).send({ data: assignment });
     }
   );
@@ -233,8 +245,54 @@ const membersRoutes: FastifyPluginAsync = async (fastify) => {
       const { orgId } = organizationParamsSchema.parse(request.params);
       ensureOrganizationAccess(request.user?.organizationId, orgId);
 
-      const result = await applyAutomaticAssignments(request.prisma, orgId, request.body);
+      const result = await applyAutomaticAssignments(
+        request.prisma,
+        fastify.memberReminderQueue,
+        orgId,
+        request.body
+      );
       return { data: result };
+    }
+  );
+
+  fastify.post(
+    '/orgs/:orgId/member-payments/:paymentId/pay',
+    { preHandler: requireMembershipRole },
+    async (request) => {
+      const { orgId, paymentId } = paymentParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const payment = await markMemberPaymentAsPaid(request.prisma, orgId, paymentId, request.body);
+      return { data: payment };
+    }
+  );
+
+  fastify.post(
+    '/orgs/:orgId/member-payments/:paymentId/overdue',
+    { preHandler: requireMembershipRole },
+    async (request) => {
+      const { orgId, paymentId } = paymentParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const payment = await markMemberPaymentAsOverdue(request.prisma, orgId, paymentId);
+      return { data: payment };
+    }
+  );
+
+  fastify.post(
+    '/orgs/:orgId/member-payments/:paymentId/justification',
+    { preHandler: requireMembershipRole },
+    async (request) => {
+      const { orgId, paymentId } = paymentParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const payment = await linkMemberPaymentJustification(
+        request.prisma,
+        orgId,
+        paymentId,
+        request.body
+      );
+      return { data: payment };
     }
   );
 };

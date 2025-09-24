@@ -12,6 +12,7 @@ import {
   createMemberFeeAssignment,
   listMemberFeeAssignments,
 } from '..';
+import { createInMemoryMemberReminderQueue } from '../../../../lib/jobs/member-reminder-queue';
 
 let prisma: PrismaClient;
 
@@ -33,13 +34,14 @@ beforeEach(async () => {
 describe('member fee assignments service', () => {
   it('auto assigns templates to matching members based on type and date', async () => {
     const organization = await prisma.organization.create({ data: { name: 'Auto Assign Org' } });
+    const queue = createInMemoryMemberReminderQueue();
 
     await withTenant(organization.id, async (tx) => {
       await createMemberFixtures(tx, organization.id);
     });
 
     const result = await withTenant(organization.id, (tx) =>
-      applyAutomaticAssignments(tx, organization.id, { referenceDate: new Date('2025-03-01') })
+      applyAutomaticAssignments(tx, queue, organization.id, { referenceDate: new Date('2025-03-01') })
     );
 
     expect(result.created).toBe(2);
@@ -56,21 +58,29 @@ describe('member fee assignments service', () => {
     expect(assignments.every((item) => item.status === MemberFeeAssignmentStatus.PENDING)).toBe(true);
     expect(assignments.map((item) => item.template.label).sort()).toEqual(['Annual Regular', 'Student Discount']);
     expect(assignments.every((item) => item.autoAssigned)).toBe(true);
+
+    const payments = await withTenant(organization.id, (tx) =>
+      tx.memberPayment.findMany({ where: { organizationId: organization.id }, orderBy: { memberId: 'asc' } })
+    );
+    expect(payments).toHaveLength(2);
+    expect(queue.reminders).toHaveLength(payments.length * 2);
+    expect(queue.reminders.every((reminder) => reminder.job.organizationId === organization.id)).toBe(true);
   });
 
   it('does not create duplicate assignments when applying rules twice', async () => {
     const organization = await prisma.organization.create({ data: { name: 'No Dup Org' } });
+    const queue = createInMemoryMemberReminderQueue();
 
     await withTenant(organization.id, async (tx) => {
       await createMemberFixtures(tx, organization.id);
     });
 
     await withTenant(organization.id, (tx) =>
-      applyAutomaticAssignments(tx, organization.id, { referenceDate: new Date('2025-04-10') })
+      applyAutomaticAssignments(tx, queue, organization.id, { referenceDate: new Date('2025-04-10') })
     );
 
     const second = await withTenant(organization.id, (tx) =>
-      applyAutomaticAssignments(tx, organization.id, { referenceDate: new Date('2025-04-10') })
+      applyAutomaticAssignments(tx, queue, organization.id, { referenceDate: new Date('2025-04-10') })
     );
 
     expect(second.created).toBe(0);
@@ -80,10 +90,15 @@ describe('member fee assignments service', () => {
     );
 
     expect(assignments).toHaveLength(2);
+    const payments = await withTenant(organization.id, (tx) =>
+      tx.memberPayment.findMany({ where: { organizationId: organization.id } })
+    );
+    expect(payments).toHaveLength(2);
   });
 
   it('skips members outside of template validity window', async () => {
     const organization = await prisma.organization.create({ data: { name: 'Validity Org' } });
+    const queue = createInMemoryMemberReminderQueue();
 
     await withTenant(organization.id, async (tx) => {
       const { templateStudent } = await createMemberFixtures(tx, organization.id);
@@ -100,7 +115,7 @@ describe('member fee assignments service', () => {
     });
 
     const result = await withTenant(organization.id, (tx) =>
-      applyAutomaticAssignments(tx, organization.id, { referenceDate: new Date('2025-03-01') })
+      applyAutomaticAssignments(tx, queue, organization.id, { referenceDate: new Date('2025-03-01') })
     );
 
     expect(result.created).toBe(1);
@@ -123,8 +138,10 @@ describe('member fee assignments service', () => {
       return { member: fixtures.memberRegular, template: fixtures.templateRegular, entry: entryRecord };
     });
 
+    const queue = createInMemoryMemberReminderQueue();
+
     const created = await withTenant(organization.id, (tx) =>
-      createMemberFeeAssignment(tx, organization.id, {
+      createMemberFeeAssignment(tx, queue, organization.id, {
         memberId: member.id,
         templateId: template.id,
         periodStart: new Date('2025-05-01'),
@@ -134,6 +151,11 @@ describe('member fee assignments service', () => {
     );
 
     expect(created.entryId).toBe(entry.id);
+
+    const payment = await withTenant(organization.id, (tx) =>
+      tx.memberPayment.findUniqueOrThrow({ where: { assignmentId: created.id } })
+    );
+    expect(payment.status).toBe('PENDING');
 
     const list = await withTenant(organization.id, (tx) =>
       listMemberFeeAssignments(tx, organization.id, { memberId: member.id })
