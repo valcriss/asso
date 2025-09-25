@@ -16,6 +16,7 @@ import authPlugin from './plugins/auth';
 import memberReminderPlugin from './plugins/member-reminders';
 import objectStoragePlugin from './plugins/object-storage';
 import antivirusPlugin from './plugins/antivirus';
+import emailPlugin from './plugins/email';
 
 dotenv.config();
 
@@ -58,6 +59,22 @@ const envSchema = z.object({
       z.string().url().optional()
     )
     .optional(),
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_USER: z
+    .preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().optional()
+    )
+    .optional(),
+  SMTP_PASSWORD: z
+    .preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().optional()
+    )
+    .optional(),
+  SMTP_FROM: z.string().email().default('no-reply@asso.local'),
   CLAMAV_ENABLED: z.coerce.boolean().default(false),
   CLAMAV_HOST: z
     .preprocess(
@@ -83,6 +100,12 @@ type RawEnvConfig = {
   S3_BUCKET?: string;
   S3_ENDPOINT?: string;
   S3_PUBLIC_URL?: string;
+  SMTP_HOST?: string;
+  SMTP_PORT?: number | string;
+  SMTP_SECURE?: boolean | string;
+  SMTP_USER?: string;
+  SMTP_PASSWORD?: string;
+  SMTP_FROM?: string;
   CLAMAV_ENABLED?: boolean | string;
   CLAMAV_HOST?: string;
   CLAMAV_PORT?: number | string;
@@ -134,6 +157,12 @@ export async function buildServer(): Promise<FastifyInstance> {
         S3_BUCKET: { type: 'string', default: 'local-bucket' },
         S3_ENDPOINT: { type: 'string', default: '' },
         S3_PUBLIC_URL: { type: 'string', default: '' },
+        SMTP_HOST: { type: 'string', default: '' },
+        SMTP_PORT: { type: 'number', default: 587 },
+        SMTP_SECURE: { type: 'boolean', default: false },
+        SMTP_USER: { type: 'string', default: '' },
+        SMTP_PASSWORD: { type: 'string', default: '' },
+        SMTP_FROM: { type: 'string', default: 'no-reply@asso.local' },
         CLAMAV_ENABLED: { type: 'boolean', default: false },
         CLAMAV_HOST: { type: 'string', default: '' },
         CLAMAV_PORT: { type: 'number', default: 3310 },
@@ -158,6 +187,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(prismaPlugin);
   await app.register(memberReminderPlugin);
   await app.register(antivirusPlugin);
+  await app.register(emailPlugin);
   await app.register(objectStoragePlugin);
 
   await app.register(rateLimit, {
