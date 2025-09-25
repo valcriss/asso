@@ -4,12 +4,16 @@ import { UserRole } from '@prisma/client';
 import { HttpProblemError } from '../lib/problem-details';
 import {
   applyAutomaticAssignments,
+  buildMemberExportCsv,
+  buildMemberExportData,
+  buildMemberExportFilename,
   createMember,
   createMemberFeeAssignment,
   createMembershipFeeTemplate,
   deleteMember,
   deleteMemberFeeAssignment,
   deleteMembershipFeeTemplate,
+  generateMemberExportPdf,
   getMember,
   getMemberFeeAssignment,
   getMembershipFeeTemplate,
@@ -19,6 +23,7 @@ import {
   linkMemberPaymentJustification,
   markMemberPaymentAsOverdue,
   markMemberPaymentAsPaid,
+  redactMemberPersonalNotes,
   updateMember,
   updateMemberFeeAssignment,
   updateMembershipFeeTemplate,
@@ -88,6 +93,57 @@ const membersRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  fastify.get(
+    '/orgs/:orgId/members/:memberId/export.json',
+    { preHandler: requireMembershipRole },
+    async (request, reply) => {
+      const { orgId, memberId } = memberParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const data = await buildMemberExportData(request.prisma, orgId, memberId);
+      const payload = { generatedAt: new Date().toISOString(), ...data };
+
+      reply
+        .header('Content-Type', 'application/json; charset=utf-8')
+        .header('Content-Disposition', `attachment; filename="${buildMemberExportFilename(data, 'json')}"`)
+        .send(payload);
+    }
+  );
+
+  fastify.get(
+    '/orgs/:orgId/members/:memberId/export.csv',
+    { preHandler: requireMembershipRole },
+    async (request, reply) => {
+      const { orgId, memberId } = memberParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const data = await buildMemberExportData(request.prisma, orgId, memberId);
+      const csv = buildMemberExportCsv(data);
+
+      reply
+        .header('Content-Type', 'text/csv; charset=utf-8')
+        .header('Content-Disposition', `attachment; filename="${buildMemberExportFilename(data, 'csv')}"`)
+        .send(csv);
+    }
+  );
+
+  fastify.get(
+    '/orgs/:orgId/members/:memberId/export.pdf',
+    { preHandler: requireMembershipRole },
+    async (request, reply) => {
+      const { orgId, memberId } = memberParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const data = await buildMemberExportData(request.prisma, orgId, memberId);
+      const pdfBytes = await generateMemberExportPdf(data);
+
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `attachment; filename="${buildMemberExportFilename(data, 'pdf')}"`)
+        .send(Buffer.from(pdfBytes));
+    }
+  );
+
   fastify.patch(
     '/orgs/:orgId/members/:memberId',
     { preHandler: requireMembershipRole },
@@ -96,6 +152,18 @@ const membersRoutes: FastifyPluginAsync = async (fastify) => {
       ensureOrganizationAccess(request.user?.organizationId, orgId);
 
       const member = await updateMember(request.prisma, orgId, memberId, request.body);
+      return { data: member };
+    }
+  );
+
+  fastify.post(
+    '/orgs/:orgId/members/:memberId/personal-notes/redact',
+    { preHandler: requireMembershipRole },
+    async (request) => {
+      const { orgId, memberId } = memberParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const member = await redactMemberPersonalNotes(request.prisma, orgId, memberId);
       return { data: member };
     }
   );

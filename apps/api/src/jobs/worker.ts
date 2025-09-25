@@ -1,6 +1,7 @@
 import 'dotenv/config';
 
 import pino from 'pino';
+import { PrismaClient } from '@prisma/client';
 import { JobRunner } from './runner';
 import { createJobDefinitions } from './definitions';
 
@@ -10,29 +11,39 @@ async function main() {
     ? process.env.REDIS_URL
     : 'redis://127.0.0.1:6379';
 
+  const prisma = new PrismaClient();
+  await prisma.$connect();
+
   const runner = new JobRunner({
     connection: { url: redisUrl },
     logger,
     defaultTimezone: process.env.JOBS_TIMEZONE ?? 'Europe/Paris',
   });
 
-  const definitions = createJobDefinitions({
-    logger,
-    timezone: process.env.JOBS_TIMEZONE ?? 'Europe/Paris',
-  });
+  try {
+    const definitions = createJobDefinitions({
+      logger,
+      timezone: process.env.JOBS_TIMEZONE ?? 'Europe/Paris',
+      prisma,
+    });
 
-  await runner.registerScheduledJobs(definitions);
+    await runner.registerScheduledJobs(definitions);
 
-  logger.info({ redisUrl }, 'Background jobs worker started');
+    logger.info({ redisUrl }, 'Background jobs worker started');
 
-  const shutdown = async (signal: NodeJS.Signals) => {
-    logger.info({ signal }, 'Shutting down jobs worker');
-    await runner.close();
-    process.exit(0);
-  };
+    const shutdown = async (signal: NodeJS.Signals) => {
+      logger.info({ signal }, 'Shutting down jobs worker');
+      await runner.close();
+      await prisma.$disconnect();
+      process.exit(0);
+    };
 
-  process.once('SIGINT', () => void shutdown('SIGINT'));
-  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+    process.once('SIGINT', () => void shutdown('SIGINT'));
+    process.once('SIGTERM', () => void shutdown('SIGTERM'));
+  } catch (error) {
+    await prisma.$disconnect().catch(() => undefined);
+    throw error;
+  }
 }
 
 void main().catch((error) => {

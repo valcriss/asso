@@ -230,6 +230,7 @@ export async function applyAutomaticAssignments(
 
   const memberWhere: Prisma.MemberWhereInput = {
     organizationId,
+    deletedAt: null,
     AND: [
       {
         OR: [{ joinedAt: null }, { joinedAt: { lte: referenceDate } }],
@@ -336,7 +337,7 @@ async function ensureMemberExists(
   memberId: string
 ): Promise<void> {
   const member = await client.member.findFirst({
-    where: { id: memberId, organizationId },
+    where: { id: memberId, organizationId, deletedAt: null },
     select: { id: true },
   });
 

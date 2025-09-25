@@ -7,7 +7,7 @@ export type MemberClient = PrismaClient | Prisma.TransactionClient;
 
 export async function listMembers(client: MemberClient, organizationId: string) {
   return client.member.findMany({
-    where: { organizationId },
+    where: { organizationId, deletedAt: null },
     orderBy: [
       { lastName: 'asc' },
       { firstName: 'asc' },
@@ -17,7 +17,7 @@ export async function listMembers(client: MemberClient, organizationId: string) 
 
 export async function getMember(client: MemberClient, organizationId: string, memberId: string) {
   const member = await client.member.findFirst({
-    where: { id: memberId, organizationId },
+    where: { id: memberId, organizationId, deletedAt: null },
   });
 
   if (!member) {
@@ -41,6 +41,7 @@ export async function createMember(client: MemberClient, organizationId: string,
         joinedAt: parsed.joinedAt,
         leftAt: parsed.leftAt,
         rgpdConsentAt: parsed.rgpdConsentAt,
+        personalNotes: parsed.personalNotes ?? null,
       },
     });
   } catch (error) {
@@ -65,7 +66,7 @@ export async function updateMember(
   const parsed = updateMemberInputSchema.parse(input);
 
   const existing = await client.member.findFirst({
-    where: { id: memberId, organizationId },
+    where: { id: memberId, organizationId, deletedAt: null },
   });
 
   if (!existing) {
@@ -95,6 +96,10 @@ export async function updateMember(
   if (parsed.rgpdConsentAt !== undefined) {
     data.rgpdConsentAt = parsed.rgpdConsentAt;
   }
+  if (parsed.personalNotes !== undefined) {
+    data.personalNotes = parsed.personalNotes;
+    data.personalNotesRedactedAt = parsed.personalNotes === null ? new Date() : null;
+  }
 
   try {
     return await client.member.update({
@@ -116,8 +121,8 @@ export async function updateMember(
 
 export async function deleteMember(client: MemberClient, organizationId: string, memberId: string) {
   const existing = await client.member.findFirst({
-    where: { id: memberId, organizationId },
-    select: { id: true },
+    where: { id: memberId, organizationId, deletedAt: null },
+    select: { id: true, email: true, personalNotes: true, personalNotesRedactedAt: true },
   });
 
   if (!existing) {
@@ -136,8 +141,46 @@ export async function deleteMember(client: MemberClient, organizationId: string,
     });
   }
 
-  await client.member.delete({
+  const hadNotes =
+    typeof existing.personalNotes === 'string' && existing.personalNotes.trim().length > 0;
+
+  await client.member.update({
     where: { id: existing.id },
+    data: {
+      deletedAt: new Date(),
+      personalNotes: null,
+      personalNotesRedactedAt: hadNotes ? new Date() : existing.personalNotesRedactedAt,
+    },
+  });
+}
+
+export async function redactMemberPersonalNotes(
+  client: MemberClient,
+  organizationId: string,
+  memberId: string
+) {
+  const existing = await client.member.findFirst({
+    where: { id: memberId, organizationId, deletedAt: null },
+    select: { id: true, personalNotes: true, personalNotesRedactedAt: true },
+  });
+
+  if (!existing) {
+    throw memberNotFoundError();
+  }
+
+  if (!existing.personalNotes || existing.personalNotes.trim() === '') {
+    return await client.member.update({
+      where: { id: existing.id },
+      data: { personalNotes: null, personalNotesRedactedAt: existing.personalNotesRedactedAt ?? new Date() },
+    });
+  }
+
+  return client.member.update({
+    where: { id: existing.id },
+    data: {
+      personalNotes: null,
+      personalNotesRedactedAt: new Date(),
+    },
   });
 }
 

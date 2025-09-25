@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const personalNotesSchema = z
+  .string()
+  .trim()
+  .max(5000, { message: 'Personal notes must be 5000 characters or fewer.' });
+
 const baseMemberInputSchema = z.object({
   firstName: z.string().trim().min(1, { message: 'First name is required.' }),
   lastName: z.string().trim().min(1, { message: 'Last name is required.' }),
@@ -8,6 +13,7 @@ const baseMemberInputSchema = z.object({
   joinedAt: z.coerce.date().optional(),
   leftAt: z.coerce.date().optional(),
   rgpdConsentAt: z.coerce.date().optional(),
+  personalNotes: personalNotesSchema.optional(),
 });
 
 function ensureValidMembershipDates(value: { joinedAt?: Date; leftAt?: Date }, ctx: z.RefinementCtx): void {
@@ -25,6 +31,7 @@ export const createMemberInputSchema = baseMemberInputSchema.superRefine(ensureV
 export type CreateMemberInput = z.infer<typeof createMemberInputSchema>;
 
 export const updateMemberInputSchema = baseMemberInputSchema
+  .extend({ personalNotes: personalNotesSchema.nullable().optional() })
   .partial()
   .superRefine((value, ctx) => {
     if (Object.values(value).every((item) => item === undefined)) {

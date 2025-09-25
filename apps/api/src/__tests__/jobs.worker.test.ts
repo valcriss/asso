@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import pino from 'pino';
 import { RedisMemoryServer } from 'redis-memory-server';
 import { JobRunner } from '../jobs/runner';
@@ -16,6 +16,12 @@ describe('scheduled jobs worker', () => {
     const port = await redis.getPort();
 
     const logger = pino({ level: 'silent' });
+    const prisma = {
+      memberPayment: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      memberFeeAssignment: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      member: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      donation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    } as unknown as Parameters<typeof createJobDefinitions>[0]['prisma'];
 
     const definitions = createJobDefinitions({
       logger,
@@ -24,6 +30,7 @@ describe('scheduled jobs worker', () => {
         executedJobs.push(jobKey);
         listeners.get(jobKey)?.();
       },
+      prisma,
     });
 
     runner = new JobRunner({
