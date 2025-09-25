@@ -11,11 +11,17 @@ export interface AuthenticatedUser {
   roles: UserRole[];
 }
 
+interface OrganizationSummary {
+  id: string;
+  name: string;
+}
+
 interface LoginResponse {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
   user: AuthenticatedUser;
+  organization?: OrganizationSummary;
 }
 
 interface RefreshResponse {
@@ -23,6 +29,7 @@ interface RefreshResponse {
   refreshToken: string;
   expiresIn: number;
   user?: AuthenticatedUser;
+  organization?: OrganizationSummary;
 }
 
 interface PersistedSession {
@@ -30,6 +37,7 @@ interface PersistedSession {
   refreshToken: string | null;
   expiresAt: number | null;
   user: AuthenticatedUser | null;
+  organization: OrganizationSummary | null;
 }
 
 interface AuthState extends PersistedSession {
@@ -63,6 +71,7 @@ export const useAuthStore = defineStore('auth', {
     refreshToken: null,
     expiresAt: null,
     user: null,
+    organization: null,
     status: 'idle',
     error: null,
     refreshTimeoutId: null,
@@ -84,6 +93,7 @@ export const useAuthStore = defineStore('auth', {
     },
     authorizationHeader: (state) =>
       state.accessToken ? { Authorization: `Bearer ${state.accessToken}` } : undefined,
+    organizationId: (state) => state.organization?.id ?? null,
   },
   actions: {
     async initializeFromStorage() {
@@ -104,6 +114,7 @@ export const useAuthStore = defineStore('auth', {
           this.refreshToken = parsed.refreshToken;
           this.expiresAt = parsed.expiresAt;
           this.user = parsed.user ?? null;
+          this.organization = parsed.organization ?? null;
 
           if (this.accessToken && this.refreshToken && this.expiresAt) {
             const secondsUntilExpiration = Math.floor((this.expiresAt - Date.now()) / 1000);
@@ -122,7 +133,7 @@ export const useAuthStore = defineStore('auth', {
 
       this.isInitialized = true;
     },
-    async login(payload: { email: string; password: string }) {
+    async login(payload: { email: string; password: string; organizationId?: string }) {
       if (this.status === 'authenticating') {
         return;
       }
@@ -144,7 +155,13 @@ export const useAuthStore = defineStore('auth', {
         }
 
         const data = (await response.json()) as LoginResponse;
-        this.applySession(data.accessToken, data.refreshToken, data.expiresIn, data.user);
+        this.applySession(
+          data.accessToken,
+          data.refreshToken,
+          data.expiresIn,
+          data.user,
+          data.organization ?? this.organization,
+        );
         this.status = 'authenticated';
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Connexion impossible.';
@@ -177,6 +194,7 @@ export const useAuthStore = defineStore('auth', {
           data.refreshToken,
           data.expiresIn,
           data.user ?? this.user ?? null,
+          data.organization ?? this.organization,
         );
       } catch (error) {
         this.logout();
@@ -189,6 +207,7 @@ export const useAuthStore = defineStore('auth', {
       this.refreshToken = null;
       this.expiresAt = null;
       this.user = null;
+      this.organization = null;
       this.status = 'idle';
       this.error = null;
       this.persistSession();
@@ -204,11 +223,13 @@ export const useAuthStore = defineStore('auth', {
       refreshToken: string,
       expiresIn: number,
       user: AuthenticatedUser | null,
+      organization: OrganizationSummary | null = null,
     ) {
       this.accessToken = accessToken;
       this.refreshToken = refreshToken;
       this.expiresAt = Date.now() + expiresIn * 1000;
       this.user = user;
+      this.organization = organization;
       this.error = null;
       this.status = 'authenticated';
       this.persistSession();
@@ -219,12 +240,11 @@ export const useAuthStore = defineStore('auth', {
       if (typeof window === 'undefined') {
         return;
       }
-      const refreshDelay = Math.max(expiresInSeconds - 30, 5) * 1000;
-      this.refreshTimeoutId = window.setTimeout(() => {
-        this.refreshTokens().catch(() => {
-          this.logout();
-        });
-      }, refreshDelay);
+
+      const timeout = Math.max(expiresInSeconds - 60, 30) * 1000;
+      this.refreshTimeoutId = setTimeout(() => {
+        this.refreshTokens().catch(() => this.logout());
+      }, timeout);
     },
     persistSession() {
       if (typeof window === 'undefined') {
@@ -236,13 +256,10 @@ export const useAuthStore = defineStore('auth', {
         refreshToken: this.refreshToken,
         expiresAt: this.expiresAt,
         user: this.user,
+        organization: this.organization,
       };
 
-      if (!payload.accessToken && !payload.refreshToken) {
-        window.localStorage.removeItem(STORAGE_KEY);
-      } else {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      }
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     },
   },
 });

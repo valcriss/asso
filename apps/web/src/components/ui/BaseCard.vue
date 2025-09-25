@@ -10,6 +10,9 @@
           <slot name="description" />
         </p>
       </div>
+      <div>
+        <slot />
+      </div>
     </div>
     <div class="pt-2">
       <slot name="actions" />

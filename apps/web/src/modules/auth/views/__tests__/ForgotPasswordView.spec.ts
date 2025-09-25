@@ -18,7 +18,7 @@ const RouterLinkStub = defineComponent({
   props: {
     to: {
       type: [String, Object],
-      required: false,
+      default: '#',
     },
   },
   setup(props, { slots }) {

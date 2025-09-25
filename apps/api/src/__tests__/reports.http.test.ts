@@ -105,6 +105,41 @@ describe('accounting reports HTTP routes', () => {
     expect(watermarkedPdf.toString('latin1')).toContain('Copy');
   });
 
+  it('returns the journal with entry lines and exports CSV/PDF', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+    const fixtures = await seedReportFixtures(organizationId, { lockFiscalYear: true });
+
+    const response = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/reports/journal`)
+      .query({ fiscalYearId: fixtures.fiscalYear.id })
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.statusCode).toBe(200);
+    const journal = response.body.data as JournalResponse;
+    expect(journal.entries).toHaveLength(4);
+    expect(journal.entries[0].lines).toHaveLength(2);
+
+    const csvResponse = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/reports/journal`)
+      .query({ fiscalYearId: fixtures.fiscalYear.id, format: 'csv' })
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(csvResponse.statusCode).toBe(200);
+    expect(csvResponse.text).toContain('Date;Journal;Reference;Memo;Account Code;Account Name;Debit;Credit');
+    expect(csvResponse.text).toContain('2025-01-10;BAN - Banque;E2025-0001;Cotisations Janvier;512000;Banque;500.00;0.00');
+
+    const pdfResponse = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/reports/journal`)
+      .query({ fiscalYearId: fixtures.fiscalYear.id, format: 'pdf' })
+      .set('Authorization', `Bearer ${accessToken}`)
+      .buffer(true)
+      .parse(binaryParser);
+
+    expect(pdfResponse.statusCode).toBe(200);
+    const pdfBuffer = pdfResponse.body as Buffer;
+    expect(pdfBuffer.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
   it('returns the general ledger with running balances and exports CSV', async () => {
     const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
     const fixtures = await seedReportFixtures(organizationId, { lockFiscalYear: true });
@@ -221,7 +256,29 @@ describe('accounting reports HTTP routes', () => {
     expect(response.statusCode).toBe(403);
     expect(response.body.title).toBe('FISCAL_YEAR_NOT_LOCKED');
   });
+
+  it('returns the fiscal dashboard with current year and journal sequences', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+    const fixtures = await seedReportFixtures(organizationId, { lockFiscalYear: false });
+
+    const response = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/accounting/dashboard`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.statusCode).toBe(200);
+    const dashboard = response.body.data as FiscalDashboardApiResponse;
+    expect(dashboard.fiscalYears).toHaveLength(1);
+    expect(dashboard.currentFiscalYear?.id).toBe(fixtures.fiscalYear.id);
+    expect(dashboard.journals).toHaveLength(1);
+    expect(dashboard.journals[0].code).toBe(fixtures.journal.code);
+    expect(dashboard.journals[0].lastReference).toBe('E2025-0004');
+    expect(dashboard.journals[0].nextReference).toBe('E2025-0005');
+  });
 });
+
+interface JournalResponse {
+  entries: Array<{ lines: Array<{ debit: number; credit: number }>; reference: string | null }>;
+}
 
 interface TrialBalanceResponse {
   lines: Array<{
@@ -258,6 +315,12 @@ interface IncomeStatementResponse {
     expense: number;
     net: number;
   };
+}
+
+interface FiscalDashboardApiResponse {
+  fiscalYears: Array<{ id: string }>;
+  currentFiscalYear: { id: string } | null;
+  journals: Array<{ code: string; lastReference: string | null; nextReference: string | null }>;
 }
 
 async function createUserWithRole(role: UserRole) {
