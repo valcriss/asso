@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --surface: 0 0% 100%;
+    --primary: 219 83% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 22% 20%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 215 20% 90%;
+    --muted-foreground: 219 19% 35%;
+    --accent: 143 70% 49%;
+    --accent-foreground: 145 83% 15%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --outline: 214 32% 91%;
+    --shadow: 222 47% 11% / 0.18;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-primary text-primary-foreground;
+  }
+}
+
+@layer components {
+  .app-container {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
