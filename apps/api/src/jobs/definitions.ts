@@ -1,11 +1,14 @@
-import type { Job } from 'bullmq';
+import type { Job, Processor } from 'bullmq';
 import type { Logger } from 'pino';
+import type { PrismaClient } from '@prisma/client';
 import type { ScheduledJobDefinition } from './runner';
+import { purgeSoftDeletedRecords } from '../modules/compliance/gdpr-purge';
 
 export interface JobDefinitionDependencies {
   logger: Logger;
   timezone?: string;
   onJobExecuted?: (jobKey: string, job: Job) => void;
+  prisma: PrismaClient;
 }
 
 function createHandler(jobKey: string, message: string, deps: JobDefinitionDependencies) {
@@ -62,8 +65,30 @@ export function createJobDefinitions(deps: JobDefinitionDependencies): Scheduled
       cron: '0 3 * * *',
       timezone,
       buildJobData: () => ({ jobType: 'gdpr-data-purge' }),
-      processor: createHandler('gdpr-data-purge', 'Processing GDPR data purge routine', deps),
+      processor: createGdprPurgeHandler(deps),
     },
   ];
+}
+
+function createGdprPurgeHandler(deps: JobDefinitionDependencies): Processor<Record<string, unknown>, void> {
+  return async (job: Job<Record<string, unknown>, void>): Promise<void> => {
+    deps.logger.info({ jobId: job.id }, 'Starting GDPR data purge');
+
+    const result = await purgeSoftDeletedRecords(deps.prisma);
+
+    deps.logger.info(
+      {
+        jobId: job.id,
+        membersPurged: result.membersPurged,
+        memberAssignmentsPurged: result.memberFeeAssignmentsPurged,
+        memberPaymentsPurged: result.memberPaymentsPurged,
+        donationsPurged: result.donationsPurged,
+      },
+      'Completed GDPR data purge'
+    );
+
+    await job.updateProgress(100);
+    deps.onJobExecuted?.('gdpr-data-purge', job as Job);
+  };
 }
 
