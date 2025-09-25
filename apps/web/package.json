@@ -10,6 +10,8 @@
     "vue-router": "4.4.5"
   },
   "devDependencies": {
+    "@testing-library/user-event": "14.6.1",
+    "@testing-library/vue": "8.1.0",
     "@types/node": "22.10.1",
     "@vitejs/plugin-vue": "5.2.1",
     "autoprefixer": "10.4.20",

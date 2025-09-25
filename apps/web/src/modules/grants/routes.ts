@@ -7,6 +7,8 @@ export const grantsRoutes: RouteRecordRaw[] = [
     component: () => import('./views/GrantsList.vue'),
     meta: {
       layout: 'main',
+      requiresAuth: true,
+      requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'],
       title: 'Subventions',
     },
   },

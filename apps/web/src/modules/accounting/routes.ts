@@ -7,6 +7,8 @@ export const accountingRoutes: RouteRecordRaw[] = [
     component: () => import('./views/AccountingOverview.vue'),
     meta: {
       layout: 'main',
+      requiresAuth: true,
+      requiredRoles: ['ADMIN', 'TREASURER'],
       title: 'Comptabilité',
     },
   },

@@ -1,11 +1,23 @@
 <template>
-  <MainLayout>
+  <component :is="layoutComponent">
     <RouterView />
-  </MainLayout>
+  </component>
 </template>
 
 <script setup lang="ts">
-import { RouterView } from 'vue-router';
+import { computed } from 'vue';
+import { RouterView, useRoute } from 'vue-router';
 
+import AuthLayout from './layouts/AuthLayout.vue';
 import MainLayout from './layouts/MainLayout.vue';
+
+const route = useRoute();
+
+const layoutComponent = computed(() => {
+  const layout = route.meta.layout;
+  if (layout === 'auth') {
+    return AuthLayout;
+  }
+  return MainLayout;
+});
 </script>
