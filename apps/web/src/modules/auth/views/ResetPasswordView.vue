@@ -11,7 +11,7 @@
       Le lien de réinitialisation est invalide ou expiré. Veuillez refaire une demande.
     </div>
 
-    <form v-else class="space-y-5" @submit.prevent="handleSubmit" novalidate>
+    <form v-else class="space-y-5" novalidate @submit.prevent="handleSubmit">
       <div class="space-y-1">
         <label for="password" class="text-sm font-medium text-foreground">Nouveau mot de passe</label>
         <input

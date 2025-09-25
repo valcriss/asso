@@ -4,10 +4,12 @@ import { UserRole } from '@prisma/client';
 import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
 import { HttpProblemError } from '../lib/problem-details';
 import {
+  getJournalReport,
   generateFecReport,
   getIncomeStatementReport,
   getLedgerReport,
   getTrialBalanceReport,
+  type JournalReport,
   type IncomeStatementReport,
   type LedgerReport,
   type TrialBalanceReport,
@@ -35,6 +37,44 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
     UserRole.VIEWER
   );
   const requireFecRole = fastify.authorizeRoles(UserRole.ADMIN, UserRole.TREASURER);
+
+  fastify.get(
+    '/orgs/:orgId/reports/journal',
+    { preHandler: requireReportRole },
+    async (request, reply) => {
+      const { orgId } = organizationParamsSchema.parse(request.params);
+      const query = reportQuerySchema.parse(request.query);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const report = await getJournalReport(request.prisma, orgId, query.fiscalYearId);
+
+      if (query.format === 'json') {
+        return { data: report };
+      }
+
+      if (query.format === 'csv') {
+        const csv = formatJournalCsv(report);
+        reply
+          .type('text/csv; charset=utf-8')
+          .header(
+            'Content-Disposition',
+            `attachment; filename="journal-${report.fiscalYear.label}.csv"`
+          )
+          .send(csv);
+        return;
+      }
+
+      const watermarkText = query.watermark === 'copy' ? 'Copy' : undefined;
+      const pdf = await formatJournalPdf(report, { watermarkText });
+      reply
+        .type('application/pdf')
+        .header(
+          'Content-Disposition',
+          `attachment; filename="journal-${report.fiscalYear.label}.pdf"`
+        )
+        .send(Buffer.from(pdf));
+    }
+  );
 
   fastify.get(
     '/orgs/:orgId/reports/balance',
@@ -207,6 +247,56 @@ function formatTrialBalanceCsv(report: TrialBalanceReport): string {
   return [header, ...lines].join('\n');
 }
 
+function formatJournalCsv(report: JournalReport): string {
+  const header = 'Date;Journal;Reference;Memo;Account Code;Account Name;Debit;Credit';
+  const rows: string[] = [];
+
+  for (const entry of report.entries) {
+    for (const line of entry.lines) {
+      rows.push(
+        [
+          entry.date,
+          `${entry.journal.code} - ${entry.journal.name}`,
+          entry.reference ?? '',
+          entry.memo ?? '',
+          line.accountCode,
+          line.accountName,
+          formatAmount(line.debit),
+          formatAmount(line.credit),
+        ].join(';')
+      );
+    }
+
+    rows.push(
+      [
+        entry.date,
+        `${entry.journal.code} - ${entry.journal.name}`,
+        entry.reference ?? '',
+        entry.memo ? `${entry.memo} (Total)` : 'Total',
+        '',
+        '',
+        formatAmount(entry.totals.debit),
+        formatAmount(entry.totals.credit),
+      ].join(';')
+    );
+  }
+
+  rows.push(
+    [
+      '',
+      'TOTAL',
+      '',
+      '',
+      '',
+      '',
+      formatAmount(report.totals.debit),
+      formatAmount(report.totals.credit),
+    ].join(';')
+  );
+
+  return [header, ...rows].join('\n');
+}
+
 async function formatTrialBalancePdf(
   report: TrialBalanceReport,
   options: PdfFormatOptions = {}
@@ -228,6 +318,68 @@ async function formatTrialBalancePdf(
   return createTablePdf(
     `Trial Balance - ${report.fiscalYear.label}`,
     ['Code', 'Name', 'Debit', 'Credit', 'Balance'],
+    rows,
+    options
+  );
+}
+
+async function formatJournalPdf(
+  report: JournalReport,
+  options: PdfFormatOptions = {}
+): Promise<Uint8Array> {
+  const rows: string[][] = [];
+
+  for (const entry of report.entries) {
+    rows.push([
+      entry.date,
+      `${entry.journal.code} - ${entry.journal.name}`,
+      entry.reference ?? '',
+      entry.memo ?? '',
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    for (const line of entry.lines) {
+      rows.push([
+        '',
+        '',
+        '',
+        '',
+        `${line.accountCode} - ${line.accountName}`,
+        formatAmount(line.debit),
+        formatAmount(line.credit),
+        '',
+      ]);
+    }
+
+    rows.push([
+      '',
+      '',
+      '',
+      'Total',
+      '',
+      formatAmount(entry.totals.debit),
+      formatAmount(entry.totals.credit),
+      '',
+    ]);
+  }
+
+  rows.push([
+    '',
+    'TOTAL',
+    '',
+    '',
+    '',
+    formatAmount(report.totals.debit),
+    formatAmount(report.totals.credit),
+    '',
+  ]);
+
+  return createTablePdf(
+    `Journal - ${report.fiscalYear.label}`,
+    ['Date', 'Journal', 'Reference', 'Memo', 'Account', 'Debit', 'Credit', ''],
     rows,
     options
   );

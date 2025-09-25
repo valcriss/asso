@@ -7,7 +7,7 @@
       </p>
     </header>
 
-    <form class="space-y-5" @submit.prevent="handleSubmit" novalidate>
+    <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
       <div class="space-y-1">
         <label for="forgot-email" class="text-sm font-medium text-foreground">Adresse e-mail</label>
         <input
