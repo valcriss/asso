@@ -21,6 +21,7 @@ This repository is structured as an npm workspaces monorepo to host the two main
   - `npm run build` — compiles TypeScript sources to `dist/` using the workspace-specific `tsconfig.json`.
   - `npm run test` — reserved for the Vitest-based suite covering domain and HTTP layers.
   - `npm run prisma:migrate` — runs Prisma migrations against the PostgreSQL database referenced by `DATABASE_URL`.
+  - `npm run prisma:seed` — executes `prisma/seed.ts` to provision the demo tenant (chart of accounts, journals BANQ/CAIS, fiscal year, members/donations, and the OFX fixture stored in `apps/api/fixtures/ofx`).
 - The TypeScript configuration outputs compiled code to `dist/` and keeps incremental build metadata next to the artifacts.
 
 ### Web (`apps/web`)

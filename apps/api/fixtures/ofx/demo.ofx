@@ -1,0 +1,66 @@
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:UTF-8
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+
+<OFX>
+  <BANKMSGSRSV1>
+    <STMTTRNRS>
+      <TRNUID>20250331001</TRNUID>
+      <STATUS>
+        <CODE>0</CODE>
+        <SEVERITY>INFO</SEVERITY>
+      </STATUS>
+      <STMTRS>
+        <CURDEF>EUR</CURDEF>
+        <BANKACCTFROM>
+          <BANKID>30006</BANKID>
+          <BRANCHID>00001</BRANCHID>
+          <ACCTID>12345678901</ACCTID>
+          <ACCTTYPE>CHECKING</ACCTTYPE>
+        </BANKACCTFROM>
+        <BANKTRANLIST>
+          <DTSTART>20250301000000</DTSTART>
+          <DTEND>20250331235959</DTEND>
+          <STMTTRN>
+            <TRNTYPE>CREDIT</TRNTYPE>
+            <DTPOSTED>20250305120000</DTPOSTED>
+            <TRNAMT>150.00</TRNAMT>
+            <FITID>SEED-0001</FITID>
+            <NAME>Don Marie Dupont</NAME>
+            <MEMO>Reçu 2025-0001</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>CREDIT</TRNTYPE>
+            <DTPOSTED>20250320101500</DTPOSTED>
+            <TRNAMT>320.00</TRNAMT>
+            <FITID>SEED-0002</FITID>
+            <NAME>Collecte conviviale</NAME>
+            <MEMO>Soirée de soutien</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20250325103000</DTPOSTED>
+            <TRNAMT>-45.90</TRNAMT>
+            <FITID>SEED-0003</FITID>
+            <NAME>Frais bancaires</NAME>
+            <MEMO>Commission mensuelle</MEMO>
+          </STMTTRN>
+        </BANKTRANLIST>
+        <LEDGERBAL>
+          <BALAMT>1330.00</BALAMT>
+          <DTASOF>20250331235959</DTASOF>
+        </LEDGERBAL>
+        <AVAILBAL>
+          <BALAMT>1330.00</BALAMT>
+          <DTASOF>20250331235959</DTASOF>
+        </AVAILBAL>
+      </STMTRS>
+    </STMTTRNRS>
+  </BANKMSGSRSV1>
+</OFX>

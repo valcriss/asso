@@ -11,6 +11,7 @@
     "format": "echo \"Format is managed at the repository root\"",
     "start": "node dist/main.js",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed",
     "jobs:worker": "ts-node-dev --respawn --transpile-only src/jobs/worker.ts"
   },
   "dependencies": {
@@ -58,5 +59,8 @@
     "typescript": "5.9.2",
     "vitest": "2.1.4",
     "redis-memory-server": "0.10.0"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   }
 }
