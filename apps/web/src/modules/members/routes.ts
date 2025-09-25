@@ -7,6 +7,8 @@ export const membersRoutes: RouteRecordRaw[] = [
     component: () => import('./views/MembersList.vue'),
     meta: {
       layout: 'main',
+      requiresAuth: true,
+      requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'],
       title: 'Membres',
     },
   },
