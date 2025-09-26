@@ -20,7 +20,6 @@ const lateOnRequestPlugin: FastifyPluginAsync = fp(async (fastify) => {
   fastify.addHook('onRequest', async (request, reply) => {
     for (const hook of lateHooks) {
       // Execute hook supporting both callback and promise styles
-      // eslint-disable-next-line no-await-in-loop
       await new Promise<void>((resolve, reject) => {
         let settled = false;
         const done = (err?: unknown) => {
@@ -51,14 +50,15 @@ const lateOnRequestPlugin: FastifyPluginAsync = fp(async (fastify) => {
     }
   });
 
-  fastify.addHook = function patchedAddHook(name: string, hook: OnRequestHook) {
+  type FastifyAddHook = typeof fastify.addHook;
+  fastify.addHook = ((...args: Parameters<FastifyAddHook>) => {
+    const [name, hook] = args;
     if (name === 'onRequest' && ready) {
-      lateHooks.push(hook);
-      return this;
+      lateHooks.push(hook as unknown as OnRequestHook);
+      return fastify;
     }
-
-    return originalAddHook(name as any, hook as any);
-  } as typeof fastify.addHook;
+    return originalAddHook(...args);
+  }) as FastifyAddHook;
 }, { name: 'late-on-request-hook' });
 
 export default lateOnRequestPlugin;

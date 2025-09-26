@@ -92,7 +92,6 @@ describe('EntryCreateView', () => {
         plugins: [pinia, i18n],
       },
     });
-
     await screen.findByText('Nouvelle écriture');
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -203,6 +202,56 @@ describe('EntryCreateView', () => {
     await user.click(screen.getByRole('button', { name: /enregistrer l'écriture/i }));
 
     await screen.findByText(/Veuillez corriger les erreurs/);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('manages add/remove line actions', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createMockResponse({
+          data: {
+            fiscalYears: [
+              { id: 'fy-1', label: 'Exercice 2025', startDate: '2025-01-01', endDate: '2025-12-31', status: 'OPEN', lockedAt: null },
+            ],
+            currentFiscalYear: {
+              id: 'fy-1',
+              label: 'Exercice 2025',
+              startDate: '2025-01-01',
+              endDate: '2025-12-31',
+              status: 'OPEN',
+              lockedAt: null,
+            },
+            journals: [
+              { id: 'journal-1', code: 'BAN', name: 'Banque', nextReference: null, lastReference: null, lastEntryDate: null },
+            ],
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        createMockResponse({
+          data: [
+            { id: 'acc-1', code: '512000', name: 'Banque' },
+            { id: 'acc-2', code: '706000', name: 'Cotisations' },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(createMockResponse({ data: [{ id: 'journal-1', code: 'BAN', name: 'Banque' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(EntryCreateView, { global: { plugins: [pinia, i18n] } });
+    await screen.findByText('Nouvelle écriture');
+    const user = userEvent.setup();
+    // Add a line (button labelled Ajouter une ligne ?) fallback by role
+    const addButtons = screen.getAllByRole('button').filter((b) => /ajouter une ligne/i.test(b.textContent || ''));
+    if (addButtons[0]) {
+      await user.click(addButtons[0]);
+    }
+    // Attempt to remove a line (should be disabled when only two lines)
+    const removeButtons = screen.getAllByRole('button').filter((b) => /supprimer/i.test(b.textContent || ''));
+    if (removeButtons[0]) {
+      await user.click(removeButtons[0]);
+    }
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

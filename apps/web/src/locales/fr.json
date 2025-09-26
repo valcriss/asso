@@ -5,8 +5,9 @@
     "footer": {
       "copyright": "© {year} Asso. Tous droits réservés.",
       "links": {
-        "legal": "Mentions légales",
+        "terms": "Conditions générales d'utilisation",
         "privacy": "Politique de confidentialité",
+        "dpa": "Accord de traitement des données",
         "support": "Support"
       }
     },
@@ -25,7 +26,8 @@
     }
   },
   "auth": {
-    "logout": "Se déconnecter"
+    "logout": "Se déconnecter",
+    "loginCTA": "Se connecter"
   },
   "common": {
     "loading": "Chargement…",
@@ -72,5 +74,145 @@
   "layout": {
     "openNavigation": "Ouvrir la navigation",
     "close": "Fermer"
+  },
+  "legal": {
+    "actions": {
+      "downloadPdf": "Télécharger en PDF"
+    },
+    "common": {
+      "lastUpdated": "Dernière mise à jour : {date}",
+      "tableOfContents": "Sommaire"
+    },
+    "terms": {
+      "title": "Conditions Générales d'Utilisation",
+      "description": "Ces conditions encadrent l'accès au service Asso et définissent les responsabilités respectives de l'association et de l'éditeur.",
+      "fileName": "asso-cgu-fr.pdf",
+      "updatedAt": "1er novembre 2024",
+      "sections": {
+        "scope": {
+          "title": "Objet et champ d'application",
+          "content": {
+            "p1": "Le service Asso est destiné à la gestion et à la comptabilité des associations loi 1901.",
+            "p2": "Toute utilisation suppose l'acceptation sans réserve des présentes conditions, y compris les politiques associées.",
+            "p3": "Les fonctionnalités peuvent évoluer pour répondre aux exigences légales et aux besoins des utilisateurs."
+          }
+        },
+        "accounts": {
+          "title": "Création de compte et accès",
+          "content": {
+            "p1": "L'administrateur d'une association garantit l'exactitude des informations fournies lors de la création du compte.",
+            "p2": "Chaque utilisateur est responsable de la confidentialité de ses identifiants et doit signaler toute activité suspecte.",
+            "p3": "L'accès peut être suspendu en cas de non-respect des obligations légales ou contractuelles."
+          }
+        },
+        "services": {
+          "title": "Fonctionnalités et disponibilité",
+          "content": {
+            "p1": "Asso met à disposition des modules de comptabilité, gestion des membres, subventions et rapports réglementaires.",
+            "p2": "Le service est disponible 24h/24 avec une maintenance programmée annoncée au moins 48 heures à l'avance.",
+            "p3": "Des sauvegardes quotidiennes sont réalisées afin d'assurer la continuité et l'intégrité des données."
+          }
+        },
+        "responsibilities": {
+          "title": "Responsabilités",
+          "content": {
+            "p1": "L'association est responsable des données saisies et de leur conformité avec les obligations comptables.",
+              "p2": "L'éditeur garantit la mise en œuvre de mesures de sécurité raisonnables et notifie toute violation pertinente.",
+            "p3": "Les dommages indirects ou pertes de profits ne peuvent être imputés à l'éditeur."
+          }
+        },
+        "contact": {
+          "title": "Contact",
+          "content": {
+            "p1": "Pour toute question, contactez support@asso.example ou consultez la documentation accessible depuis l'application."
+          }
+        }
+      }
+    },
+    "privacy": {
+      "title": "Politique de confidentialité",
+      "description": "Cette politique décrit les traitements de données personnelles opérés par Asso pour le compte des associations clientes.",
+      "fileName": "asso-politique-confidentialite-fr.pdf",
+      "updatedAt": "1er novembre 2024",
+      "sections": {
+        "collection": {
+          "title": "Collecte des données",
+          "content": {
+            "p1": "Les données d'identification, de facturation et de comptabilité sont collectées pour fournir le service.",
+            "p2": "Les journaux d'activité sont conservés trois ans pour assurer la traçabilité des opérations sensibles." 
+          }
+        },
+        "use": {
+          "title": "Utilisation des données",
+          "content": {
+            "p1": "Les données sont utilisées pour l'exécution du contrat, la conformité légale et l'amélioration continue de la plateforme.",
+            "p2": "Aucune donnée n'est revendue. Les sous-traitants sont soumis à un accord de traitement conforme au RGPD." 
+          }
+        },
+        "rights": {
+          "title": "Droits des personnes",
+          "content": {
+            "p1": "Chaque membre peut exercer ses droits d'accès, de rectification, d'opposition et d'effacement via l'association ou directement auprès de l'éditeur.",
+            "p2": "Les demandes sont traitées sous 30 jours et enregistrées dans un registre des requêtes RGPD." 
+          }
+        },
+        "security": {
+          "title": "Sécurité et conservation",
+          "content": {
+            "p1": "Les données sont hébergées dans l'Union européenne avec des sauvegardes chiffrées et un contrôle d'accès strict.",
+            "p2": "Les informations sont conservées pendant la durée du contrat augmentée des obligations légales de conservation." 
+          }
+        },
+        "contact": {
+          "title": "Contact",
+          "content": {
+            "p1": "Les responsables peuvent adresser leurs questions à privacy@asso.example ou au Délégué à la protection des données." 
+          }
+        }
+      }
+    },
+    "dpa": {
+      "title": "Data Processing Agreement",
+      "description": "L'accord précise les obligations respectives du responsable de traitement (l'association) et du sous-traitant (Asso).",
+      "fileName": "asso-dpa-fr.pdf",
+      "updatedAt": "1er novembre 2024",
+      "sections": {
+        "purpose": {
+          "title": "Objet",
+          "content": {
+            "p1": "Le présent accord encadre les traitements réalisés par Asso pour le compte de l'association conformément au RGPD.",
+            "p2": "Il s'applique pendant toute la durée du contrat et pendant la période de réversibilité des données." 
+          }
+        },
+        "instructions": {
+          "title": "Instructions documentées",
+          "content": {
+            "p1": "Asso ne traite les données personnelles que sur instruction documentée de l'association.",
+            "p2": "Toute demande contraire au droit applicable est immédiatement signalée au responsable de traitement." 
+          }
+        },
+        "security": {
+          "title": "Mesures de sécurité",
+          "content": {
+            "p1": "Des mesures techniques et organisationnelles adaptées protègent les données contre la destruction, la perte ou la divulgation accidentelles.",
+            "p2": "Les accès sont limités aux personnes autorisées et font l'objet d'une journalisation détaillée." 
+          }
+        },
+        "subprocessors": {
+          "title": "Sous-traitance ultérieure",
+          "content": {
+            "p1": "L'association est informée de tout sous-traitant additionnel et dispose d'un droit d'opposition documenté.",
+            "p2": "Asso impose contractuellement à ses sous-traitants les mêmes obligations de sécurité et de confidentialité." 
+          }
+        },
+        "assistance": {
+          "title": "Assistance et coopération",
+          "content": {
+            "p1": "Asso assiste l'association dans les demandes d'exercice des droits et la notification d'incidents.",
+            "p2": "À la fin du contrat, les données sont restituées ou supprimées de manière sécurisée selon le choix de l'association." 
+          }
+        }
+      }
+    }
   }
 }
