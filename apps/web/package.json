@@ -11,10 +11,10 @@
     "vue-router": "4.4.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.9.0",
     "@playwright/test": "1.49.0",
     "@testing-library/user-event": "14.6.1",
     "@testing-library/vue": "8.1.0",
-    "@axe-core/playwright": "4.9.0",
     "@types/node": "22.10.1",
     "@vitejs/plugin-vue": "5.2.1",
     "autoprefixer": "10.4.20",
@@ -28,7 +28,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run --passWithNoTests && playwright test --reporter=list",
+    "test": "vitest run --passWithNoTests --coverage && playwright test --reporter=list",
     "test:e2e": "playwright test --reporter=list",
     "lint": "echo \"Lint is managed at the repository root\"",
     "format": "echo \"Format is managed at the repository root\""
