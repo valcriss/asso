@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "build": "tsc -p tsconfig.json",
+    "pretest": "prisma generate",
     "test": "vitest run --coverage",
     "lint": "echo \"Lint is managed at the repository root\"",
     "format": "echo \"Format is managed at the repository root\"",

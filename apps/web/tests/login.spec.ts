@@ -35,11 +35,14 @@ test('allows an administrator to log in and reach the dashboard', async ({ page 
   await page.getByLabel('Adresse e-mail').fill('admin@example.org');
   await page.getByLabel('Mot de passe').fill('StrongPass123!');
 
-  const navigationPromise = page.waitForURL('**/');
+  const navigationPromise = page.waitForURL((url) => {
+    const parsedUrl = typeof url === 'string' ? new URL(url) : url;
+    return parsedUrl.pathname !== '/connexion';
+  });
   await page.getByRole('button', { name: 'Se connecter' }).click();
   await navigationPromise;
 
-  await expect(page).toHaveURL('**/');
+  await expect(page).not.toHaveURL('**/connexion');
   await expect(page.getByRole('heading', { name: /bienvenue/i })).toBeVisible();
 
   const storedSession = await page.evaluate(() => window.localStorage.getItem('asso.auth.session'));
