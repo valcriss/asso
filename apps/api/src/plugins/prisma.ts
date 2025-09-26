@@ -1,6 +1,7 @@
 import fp from 'fastify-plugin';
 import { Prisma, PrismaClient, UserRole } from '@prisma/client';
 import { z } from 'zod';
+import { HttpProblemError } from '../lib/problem-details';
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -20,6 +21,7 @@ export interface AuthenticatedUser {
   id: string;
   organizationId: string;
   roles: UserRole[];
+  isSuperAdmin: boolean;
 }
 
 declare module 'fastify' {
@@ -86,11 +88,37 @@ const prismaPlugin = fp(async (fastify) => {
     request.prisma = prisma;
 
     const organizationId = request.user?.organizationId;
-    if (!organizationId) {
+    const isSuperAdminPath =
+      request.user?.isSuperAdmin && typeof request.raw.url === 'string'
+        ? request.raw.url.startsWith('/api/v1/super-admin')
+        : false;
+
+    if (!organizationId || isSuperAdminPath) {
       return;
     }
 
     const validatedOrgId = organizationIdSchema.parse(organizationId);
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: validatedOrgId },
+      select: { accessLockedAt: true },
+    });
+
+    if (!organization) {
+      throw new HttpProblemError({
+        status: 403,
+        title: 'FORBIDDEN_ORGANIZATION_ACCESS',
+        detail: 'You do not have access to this organization.',
+      });
+    }
+
+    if (organization.accessLockedAt) {
+      throw new HttpProblemError({
+        status: 423,
+        title: 'ORGANIZATION_LOCKED',
+        detail: 'This organization is currently locked by a super-admin.',
+      });
+    }
 
     const ready = createDeferred<void>();
     const release = createDeferred<void>();

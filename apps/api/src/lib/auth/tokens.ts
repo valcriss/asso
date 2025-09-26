@@ -13,6 +13,7 @@ export interface AccessTokenPayload {
   userId: string;
   organizationId: string;
   roles: UserRole[];
+  isSuperAdmin: boolean;
 }
 
 export interface RefreshTokenDetails {
@@ -26,6 +27,7 @@ export interface VerifiedRefreshToken {
   userId: string;
   organizationId: string;
   roles: UserRole[];
+  isSuperAdmin: boolean;
 }
 
 const userRoleEnum = z.nativeEnum(UserRole);
@@ -35,6 +37,7 @@ const accessTokenSchema = z
     type: z.literal('access'),
     orgId: z.string().uuid(),
     roles: z.array(userRoleEnum).nonempty(),
+    superAdmin: z.boolean().optional(),
     sub: z.string().uuid(),
   })
   .passthrough();
@@ -44,6 +47,7 @@ const refreshTokenSchema = z
     type: z.literal('refresh'),
     orgId: z.string().uuid(),
     roles: z.array(userRoleEnum).nonempty(),
+    superAdmin: z.boolean().optional(),
     sub: z.string().uuid(),
     jti: z.string().uuid(),
   })
@@ -51,7 +55,12 @@ const refreshTokenSchema = z
 
 export function createAccessToken(payload: AccessTokenPayload, config: TokenConfig): string {
   return jwt.sign(
-    { type: 'access', orgId: payload.organizationId, roles: payload.roles },
+    {
+      type: 'access',
+      orgId: payload.organizationId,
+      roles: payload.roles,
+      superAdmin: payload.isSuperAdmin,
+    },
     config.accessSecret,
     {
       algorithm: 'HS256',
@@ -66,7 +75,12 @@ export function createRefreshToken(payload: AccessTokenPayload, config: TokenCon
   const expiresAt = calculateRefreshExpiry(config.refreshTokenTtlDays);
 
   const token = jwt.sign(
-    { type: 'refresh', orgId: payload.organizationId, roles: payload.roles },
+    {
+      type: 'refresh',
+      orgId: payload.organizationId,
+      roles: payload.roles,
+      superAdmin: payload.isSuperAdmin,
+    },
     config.refreshSecret,
     {
       algorithm: 'HS256',
@@ -87,6 +101,7 @@ export function verifyAccessToken(token: string, config: TokenConfig): AccessTok
     userId: parsed.sub,
     organizationId: parsed.orgId,
     roles: parsed.roles,
+    isSuperAdmin: parsed.superAdmin ?? false,
   } satisfies AccessTokenPayload;
 }
 
@@ -99,6 +114,7 @@ export function verifyRefreshToken(token: string, config: TokenConfig): Verified
     userId: parsed.sub,
     organizationId: parsed.orgId,
     roles: parsed.roles,
+    isSuperAdmin: parsed.superAdmin ?? false,
   } satisfies VerifiedRefreshToken;
 }
 

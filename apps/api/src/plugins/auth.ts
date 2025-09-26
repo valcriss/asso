@@ -22,6 +22,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     authenticate(request: import('fastify').FastifyRequest): Promise<void>;
     authorizeRoles: (...roles: UserRole[]) => (request: import('fastify').FastifyRequest) => Promise<void>;
+    authorizeSuperAdmin: () => (request: import('fastify').FastifyRequest) => Promise<void>;
     tokenConfig: TokenConfig;
     issueAccessToken(payload: AccessTokenPayload): string;
     issueRefreshToken(payload: AccessTokenPayload): RefreshTokenDetails;
@@ -64,6 +65,7 @@ const authPlugin: FastifyPluginAsync = fp(async (fastify) => {
         id: payload.userId,
         organizationId: payload.organizationId,
         roles: payload.roles,
+        isSuperAdmin: payload.isSuperAdmin,
       };
     } catch (error) {
       request.accessTokenError = error instanceof Error ? error : new Error('Invalid access token');
@@ -100,6 +102,10 @@ const authPlugin: FastifyPluginAsync = fp(async (fastify) => {
     return async function roleGuard(request) {
       await fastify.authenticate(request);
 
+      if (request.user?.isSuperAdmin) {
+        return;
+      }
+
       const userRoles = request.user?.roles ?? [];
       const isAllowed = userRoles.some((role) => normalizedRoles.includes(role));
 
@@ -108,6 +114,20 @@ const authPlugin: FastifyPluginAsync = fp(async (fastify) => {
           status: 403,
           title: 'FORBIDDEN',
           detail: 'You do not have the required role.',
+        });
+      }
+    };
+  });
+
+  fastify.decorate('authorizeSuperAdmin', function authorizeSuperAdmin() {
+    return async function superAdminGuard(request) {
+      await fastify.authenticate(request);
+
+      if (!request.user?.isSuperAdmin) {
+        throw new HttpProblemError({
+          status: 403,
+          title: 'FORBIDDEN',
+          detail: 'Super-admin privileges are required.',
         });
       }
     };

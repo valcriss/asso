@@ -223,6 +223,26 @@ describe('projects HTTP routes', () => {
     expect(csv[csv.length - 2]).toContain('PLANNED');
     expect(csv[csv.length - 1]).toContain('VARIANCE');
   });
+
+  it('rejects access to locked organizations with a 423 response', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+
+    await prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        accessLockedAt: new Date('2025-04-01T12:00:00Z'),
+        accessLockedReason: 'Audit de conformité',
+      },
+    });
+
+    const response = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/projects`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.statusCode).toBe(423);
+    expect(response.body.title).toBe('ORGANIZATION_LOCKED');
+    expect(response.body.detail).toContain('super-admin');
+  });
 });
 
 async function createUserWithRole(role: UserRole) {
@@ -246,6 +266,7 @@ async function createUserWithRole(role: UserRole) {
     userId: user.id,
     organizationId: organization.id,
     roles: [role],
+    isSuperAdmin: false,
   });
 
   return { organizationId: organization.id, accessToken, userId: user.id };

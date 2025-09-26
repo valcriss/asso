@@ -5,9 +5,19 @@ import { authRoutes } from '@/modules/auth/routes';
 import { dashboardRoutes } from '@/modules/dashboard/routes';
 import { grantsRoutes } from '@/modules/grants/routes';
 import { membersRoutes } from '@/modules/members/routes';
+import { projectsRoutes } from '@/modules/projects/routes';
+import { superAdminRoutes } from '@/modules/super-admin/routes';
 import { useAuthStore, type UserRole } from '@/store';
 
-const routes = [...authRoutes, ...dashboardRoutes, ...accountingRoutes, ...membersRoutes, ...grantsRoutes];
+const routes = [
+  ...authRoutes,
+  ...dashboardRoutes,
+  ...accountingRoutes,
+  ...membersRoutes,
+  ...grantsRoutes,
+  ...projectsRoutes,
+  ...superAdminRoutes,
+];
 
 export function createAppRouter(history: RouterHistory = createWebHistory(import.meta.env.BASE_URL)) {
   const router = createRouter({
@@ -32,6 +42,11 @@ export function createAppRouter(history: RouterHistory = createWebHistory(import
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
       const redirectQuery = to.fullPath && to.fullPath !== '/connexion' ? { redirect: to.fullPath } : undefined;
       return redirectQuery ? { name: 'auth.login', query: redirectQuery } : { name: 'auth.login' };
+    }
+
+    const requiresSuperAdmin = Boolean(to.meta.requiresSuperAdmin);
+    if (to.meta.requiresAuth && requiresSuperAdmin && !authStore.isSuperAdmin) {
+      return { name: 'dashboard.home' };
     }
 
     const requiredRoles = (to.meta.requiredRoles as UserRole[] | undefined) ?? [];

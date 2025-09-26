@@ -12,6 +12,11 @@ model Organization {
   name                     String
   createdAt                DateTime                  @default(now()) @map("created_at")
   updatedAt                DateTime                  @updatedAt @map("updated_at")
+  accessLockedAt           DateTime?                 @map("access_locked_at")
+  accessLockedBy           String?                   @map("access_locked_by") @db.Uuid
+  accessLockedReason       String?                   @map("access_locked_reason")
+  apiSecret                String?                   @map("api_secret")
+  apiSecretRotatedAt       DateTime?                 @map("api_secret_rotated_at")
   fiscalYears              FiscalYear[]
   accounts                 Account[]
   journals                 Journal[]
@@ -406,6 +411,7 @@ model User {
   id            String         @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
   email         String         @unique
   passwordHash  String         @map("password_hash")
+  isSuperAdmin  Boolean        @default(false) @map("is_super_admin")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   roles         UserOrgRole[]

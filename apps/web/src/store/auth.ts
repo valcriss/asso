@@ -9,6 +9,7 @@ export interface AuthenticatedUser {
   email: string;
   displayName?: string;
   roles: UserRole[];
+  isSuperAdmin?: boolean;
 }
 
 interface OrganizationSummary {
@@ -91,6 +92,7 @@ export const useAuthStore = defineStore('auth', {
         return expectedRoles.some((role) => this.roles.includes(role));
       };
     },
+    isSuperAdmin: (state) => state.user?.isSuperAdmin ?? false,
     authorizationHeader: (state) =>
       state.accessToken ? { Authorization: `Bearer ${state.accessToken}` } : undefined,
     organizationId: (state) => state.organization?.id ?? null,
