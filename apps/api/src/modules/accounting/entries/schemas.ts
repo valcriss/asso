@@ -101,3 +101,12 @@ export const createEntryInputSchema = z.object({
 });
 
 export type CreateEntryInput = z.infer<typeof createEntryInputSchema>;
+
+export const reverseEntryInputSchema = z.object({
+  fiscalYearId: z.string().uuid(),
+  date: z.coerce.date(),
+  journalId: z.string().uuid().optional(),
+  memo: z.string().trim().max(1024).optional(),
+});
+
+export type ReverseEntryInput = z.infer<typeof reverseEntryInputSchema>;

@@ -54,7 +54,7 @@ export async function getFiscalDashboard(
   const currentFiscalYear =
     fiscalYears.find((fiscalYear) => fiscalYear.lockedAt === null) ?? fiscalYears.at(0) ?? null;
 
-  const dashboardYears = fiscalYears.map((fiscalYear) => ({
+  const dashboardYears: FiscalDashboardYear[] = fiscalYears.map((fiscalYear) => ({
     id: fiscalYear.id,
     label: fiscalYear.label,
     startDate: toIsoDate(fiscalYear.startDate),

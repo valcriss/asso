@@ -2,7 +2,7 @@ import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { PrismaInstrumentation } from '@prisma/instrumentation';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { parseConfig, type RawEnvConfig } from './config';
@@ -35,7 +35,7 @@ export function initializeTelemetry(): NodeSDK | undefined {
     exporterOptions.headers = parseHeaders(config.OTEL_EXPORTER_OTLP_HEADERS);
   }
 
-  const resource = new Resource({
+  const resource = resourceFromAttributes({
     [SemanticResourceAttributes.SERVICE_NAME]: config.OTEL_SERVICE_NAME,
     [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: config.SENTRY_ENVIRONMENT ?? config.NODE_ENV,
   });
@@ -47,7 +47,10 @@ export function initializeTelemetry(): NodeSDK | undefined {
       new PrismaInstrumentation(),
       getNodeAutoInstrumentations({
         '@opentelemetry/instrumentation-http': {
-          ignoreIncomingPaths: ['/health', '/healthz', '/metrics'],
+          ignoreIncomingRequestHook: (request) => {
+            const url = request.url ?? '';
+            return ['/health', '/healthz', '/metrics'].some((path) => url.startsWith(path));
+          },
         },
       }),
     ],

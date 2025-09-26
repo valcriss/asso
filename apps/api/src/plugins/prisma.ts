@@ -181,6 +181,24 @@ const prismaPlugin = fp(async (fastify) => {
     await ready.promise;
   });
 
+  fastify.addHook('onRoute', (routeOptions) => {
+    const originalHandler = routeOptions.handler;
+
+    if (typeof originalHandler !== 'function') {
+      return;
+    }
+
+    routeOptions.handler = async function wrappedHandler(request, reply) {
+      const result = await originalHandler.call(this, request, reply);
+
+      if (request.tenantTransaction && !request.tenantTransaction.settled) {
+        await request.tenantTransaction.commit();
+      }
+
+      return result;
+    };
+  });
+
   fastify.addHook('onResponse', async (request) => {
     const context = request.tenantTransaction;
     if (!context) {

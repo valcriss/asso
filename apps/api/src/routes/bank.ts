@@ -13,7 +13,15 @@ import { recordBankStatement } from '../modules/accounting/bank-statements';
 import {
   getReconciliationSuggestions,
   importOfxTransactions,
+  confirmReconciliation,
 } from '../modules/accounting/bank-transactions';
+import {
+  listOfxRules,
+  createOfxRule,
+  updateOfxRule,
+  deleteOfxRule,
+} from '../modules/accounting/ofx-rules';
+import { writeAuditLog } from '../modules/audit/service';
 
 const organizationParamsSchema = z.object({
   orgId: z.string().uuid(),
@@ -119,6 +127,105 @@ const bankRoutes: FastifyPluginAsync = async (fastify) => {
 
       const result = await getReconciliationSuggestions(request.prisma, orgId, request.body);
       return { data: result };
+    }
+  );
+
+  fastify.post(
+    '/orgs/:orgId/bank/reconcile/confirm',
+    { preHandler: requireTreasuryRole },
+    async (request) => {
+      const { orgId } = organizationParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const result = await confirmReconciliation(request.prisma, orgId, request.body);
+
+      const userId = request.user?.id ?? null;
+      await writeAuditLog(
+        request.prisma,
+        orgId,
+        userId,
+        'BANK_RECONCILIATION_CONFIRMED',
+        'bank_transaction',
+        result.transactionId,
+        { entryId: result.entryId }
+      );
+
+      return { data: result };
+    }
+  );
+
+  // OFX rules CRUD
+  fastify.get(
+    '/orgs/:orgId/bank/ofx-rules',
+    { preHandler: requireTreasuryRole },
+    async (request) => {
+      const { orgId } = organizationParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const rules = await listOfxRules(request.prisma, orgId, request.query);
+      return { data: rules };
+    }
+  );
+
+  fastify.post(
+    '/orgs/:orgId/bank/ofx-rules',
+    { preHandler: requireTreasuryRole },
+    async (request, reply) => {
+      const { orgId } = organizationParamsSchema.parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const rule = await createOfxRule(request.prisma, orgId, request.body);
+      await writeAuditLog(
+        request.prisma,
+        orgId,
+        request.user?.id ?? null,
+        'OFX_RULE_CREATED',
+        'ofx_rule',
+        rule.id,
+        { bankAccountId: rule.bankAccountId, priority: rule.priority }
+      );
+      reply.status(201).send({ data: rule });
+    }
+  );
+
+  fastify.patch(
+    '/orgs/:orgId/bank/ofx-rules/:ruleId',
+    { preHandler: requireTreasuryRole },
+    async (request) => {
+      const params = organizationParamsSchema.extend({ ruleId: z.string().uuid() }).parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, params.orgId);
+
+      const rule = await updateOfxRule(request.prisma, params.orgId, params.ruleId, request.body);
+      await writeAuditLog(
+        request.prisma,
+        params.orgId,
+        request.user?.id ?? null,
+        'OFX_RULE_UPDATED',
+        'ofx_rule',
+        rule.id,
+        { isActive: rule.isActive, priority: rule.priority }
+      );
+      return { data: rule };
+    }
+  );
+
+  fastify.delete(
+    '/orgs/:orgId/bank/ofx-rules/:ruleId',
+    { preHandler: requireTreasuryRole },
+    async (request, reply) => {
+      const params = organizationParamsSchema.extend({ ruleId: z.string().uuid() }).parse(request.params);
+      ensureOrganizationAccess(request.user?.organizationId, params.orgId);
+
+      await deleteOfxRule(request.prisma, params.orgId, params.ruleId);
+      await writeAuditLog(
+        request.prisma,
+        params.orgId,
+        request.user?.id ?? null,
+        'OFX_RULE_DELETED',
+        'ofx_rule',
+        params.ruleId
+      );
+      reply.status(204).send();
     }
   );
 };

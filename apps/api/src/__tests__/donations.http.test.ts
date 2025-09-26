@@ -374,7 +374,7 @@ async function createBalancedEntry(organizationId: string, options: EntryOptions
               debit: new Prisma.Decimal(0),
               credit: new Prisma.Decimal(options.amount),
             },
-          ],
+          ].map((line, position) => ({ ...line, position })),
         },
       },
     });

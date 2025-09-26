@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
-import { Prisma } from '@prisma/client';
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { HttpProblemError } from '../lib/problem-details';
+
+const uuidSchema = z.string().uuid();
 
 const searchQuerySchema = z.object({
   q: z
@@ -33,7 +34,6 @@ const organizationSummarySelect = {
   accessLockedReason: true,
   apiSecret: true,
   apiSecretRotatedAt: true,
-  _count: { select: { projects: true } },
 } satisfies Prisma.OrganizationSelect;
 
 type OrganizationSummaryRow = Prisma.OrganizationGetPayload<{
@@ -52,10 +52,15 @@ const superAdminRoutes: FastifyPluginAsync = async (fastify) => {
       const where: Prisma.OrganizationWhereInput = {};
 
       if (query.q) {
-        where.OR = [
+        const searchPredicates: Prisma.OrganizationWhereInput[] = [
           { name: { contains: query.q, mode: 'insensitive' } },
-          { id: query.q },
         ];
+
+        if (uuidSchema.safeParse(query.q).success) {
+          searchPredicates.push({ id: query.q });
+        }
+
+        where.OR = searchPredicates;
       }
 
       if (query.status === 'active') {
@@ -75,7 +80,9 @@ const superAdminRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return {
-        data: organizations.map(mapOrganizationSummary),
+        data: await Promise.all(
+          organizations.map((organization) => mapWithProjectCount(request.prisma, organization))
+        ),
       };
     }
   );
@@ -92,7 +99,7 @@ const superAdminRoutes: FastifyPluginAsync = async (fastify) => {
         throw organizationNotFoundError();
       }
 
-      if (existing.accessLockedAt) {
+      if (existing.lockedAt) {
         throw new HttpProblemError({
           status: 409,
           title: 'ORGANIZATION_ALREADY_LOCKED',
@@ -111,7 +118,7 @@ const superAdminRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return {
-        data: mapOrganizationSummary(updated),
+        data: await mapWithProjectCount(request.prisma, updated),
       };
     }
   );
@@ -127,7 +134,7 @@ const superAdminRoutes: FastifyPluginAsync = async (fastify) => {
         throw organizationNotFoundError();
       }
 
-      if (!existing.accessLockedAt) {
+      if (!existing.lockedAt) {
         throw new HttpProblemError({
           status: 409,
           title: 'ORGANIZATION_NOT_LOCKED',
@@ -146,7 +153,7 @@ const superAdminRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return {
-        data: mapOrganizationSummary(updated),
+        data: await mapWithProjectCount(request.prisma, updated),
       };
     }
   );
@@ -175,7 +182,7 @@ const superAdminRoutes: FastifyPluginAsync = async (fastify) => {
 
       return {
         data: {
-          ...mapOrganizationSummary(updated),
+          ...(await mapWithProjectCount(request.prisma, updated)),
           secret,
         },
       };
@@ -183,7 +190,15 @@ const superAdminRoutes: FastifyPluginAsync = async (fastify) => {
   );
 };
 
-function mapOrganizationSummary(organization: OrganizationSummaryRow) {
+async function mapWithProjectCount(
+  client: PrismaClient | Prisma.TransactionClient,
+  organization: OrganizationSummaryRow
+) {
+  const projectCount = await countProjectsForOrganization(client, organization.id);
+  return mapOrganizationSummary(organization, projectCount);
+}
+
+function mapOrganizationSummary(organization: OrganizationSummaryRow, projectCount: number) {
   return {
     id: organization.id,
     name: organization.name,
@@ -194,18 +209,25 @@ function mapOrganizationSummary(organization: OrganizationSummaryRow) {
     lockReason: organization.accessLockedReason ?? null,
     hasActiveSecret: Boolean(organization.apiSecret),
     lastSecretRotationAt: toIso(organization.apiSecretRotatedAt),
-    projectCount: organization._count.projects,
+    projectCount,
   };
 }
 
 async function fetchOrganizationSummary(
   client: PrismaClient | Prisma.TransactionClient,
   organizationId: string
-): Promise<OrganizationSummaryRow | null> {
-  return client.organization.findUnique({
+): Promise<ReturnType<typeof mapOrganizationSummary> | null> {
+  const organization = await client.organization.findUnique({
     where: { id: organizationId },
     select: organizationSummarySelect,
   });
+
+  if (!organization) {
+    return null;
+  }
+
+  const projectCount = await countProjectsForOrganization(client, organization.id);
+  return mapOrganizationSummary(organization, projectCount);
 }
 
 function organizationNotFoundError(): HttpProblemError {
@@ -218,6 +240,32 @@ function organizationNotFoundError(): HttpProblemError {
 
 function toIso(value: Date | null): string | null {
   return value ? value.toISOString() : null;
+}
+
+async function countProjectsForOrganization(
+  client: PrismaClient | Prisma.TransactionClient,
+  organizationId: string
+): Promise<number> {
+  const setTenant = `SET app.current_org = '${organizationId}'`;
+  const resetTenant = 'RESET app.current_org';
+
+  if (client instanceof PrismaClient) {
+    return client.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(setTenant);
+      try {
+        return await tx.project.count();
+      } finally {
+        await tx.$executeRawUnsafe(resetTenant);
+      }
+    });
+  }
+
+  await client.$executeRawUnsafe(setTenant);
+  try {
+    return await client.project.count();
+  } finally {
+    await client.$executeRawUnsafe(resetTenant);
+  }
 }
 
 export default superAdminRoutes;

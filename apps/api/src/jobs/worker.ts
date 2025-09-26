@@ -47,8 +47,6 @@ async function main() {
 }
 
 void main().catch((error) => {
-  // eslint-disable-next-line no-console
   console.error('Failed to start jobs worker', error);
   process.exit(1);
 });
-

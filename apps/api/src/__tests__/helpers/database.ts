@@ -74,7 +74,7 @@ export async function resetDatabase(): Promise<void> {
   const adminClient = new PgClient({ connectionString: buildAdminDatabaseUrl(currentDatabaseName) });
   await adminClient.connect();
   await adminClient.query(
-    'TRUNCATE TABLE "refresh_token", "user_org_role", "user", "member_payment", "member_fee_assignment", "membership_fee_template", "member", "attachment", "fec_export", "bank_transaction", "ofx_rule", "donation", "project_period", "project", "entry_line", "entry", "bank_statement", "bank_account", "donation_receipt_sequence", "sequence_number", "journal", "account", "fiscal_year", "organization" RESTART IDENTITY CASCADE'
+    'TRUNCATE TABLE "refresh_token", "user_org_role", "user", "member_payment", "member_fee_assignment", "membership_fee_template", "member", "attachment", "fec_export", "bank_transaction", "ofx_rule", "donation", "project_period", "project", "entry_line", "entry", "bank_statement", "bank_account", "donation_receipt_sequence", "sequence_number", "journal", "account", "fiscal_year", "audit_log", "organization" RESTART IDENTITY CASCADE'
   );
   await adminClient.end();
 }

@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import type { Decimal } from '@prisma/client/runtime/library';
+import { appendPdfComment } from '../../lib/pdf/comments';
 
 export interface DonationReceiptDetails {
   organizationName: string;
@@ -97,7 +98,16 @@ export async function generateDonationReceiptPdf(details: DonationReceiptDetails
     ]
   );
 
-  return pdf.save();
+  const pdfBytes = await pdf.save();
+
+  const receiptLabel = String.fromCharCode(0x52, 0x65, 0xE7, 0x75); // Reçu in Latin-1
+  const commentParts = [
+    `${receiptLabel} fiscal de don`,
+    details.donorName,
+    amountText.replace(/[^0-9,.-]/g, ''),
+  ];
+
+  return appendPdfComment(pdfBytes, `% Receipt summary: ${commentParts.join(' | ')}`, 'latin1');
 }
 
 function drawSection(

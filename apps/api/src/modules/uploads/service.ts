@@ -150,10 +150,11 @@ function buildStorageKey(
   const extension = extname(filename);
   const basename = extension ? filename.slice(0, -extension.length) : filename;
   const safeExtension = extension || '';
+  const targetSegment = target.targetType === 'entry' ? 'entries' : 'projects';
   return [
     'attachments',
     organizationId,
-    `${target.targetType}s`,
+    targetSegment,
     target.targetId,
     `${basename}-${unique}${safeExtension}`,
   ]
