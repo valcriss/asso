@@ -14,7 +14,7 @@ import { computed } from 'vue';
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'primary' | 'accent' | 'secondary';
+    variant?: 'primary' | 'accent' | 'secondary' | 'outline' | 'success';
   }>(),
   {
     variant: 'primary',
@@ -27,6 +27,10 @@ const badgeClasses = computed(() => {
       return 'bg-accent/20 text-accent border border-accent/30';
     case 'secondary':
       return 'bg-secondary text-secondary-foreground';
+    case 'outline':
+      return 'border border-outline/50 bg-background text-foreground';
+    case 'success':
+      return 'border border-emerald-200 bg-emerald-100 text-emerald-700';
     default:
       return 'bg-primary/15 text-primary';
   }
