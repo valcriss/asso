@@ -48,7 +48,7 @@ describe('OfxImportView', () => {
   });
 
   it('affiche la progression et les transactions importées', async () => {
-    render(OfxImportView, { global: { plugins: [pinia, i18n] } });
+  render(OfxImportView, { global: { plugins: [pinia, i18n] } });
 
     const fileInput = screen.getByTestId('ofx-file-input') as HTMLInputElement;
     const file = new File([sampleOfx], 'transactions.ofx', { type: 'application/x-ofx' });
@@ -65,7 +65,7 @@ describe('OfxImportView', () => {
   });
 
   it('permet de lettrer manuellement et journalise l\'action', async () => {
-    render(OfxImportView, { global: { plugins: [pinia, i18n] } });
+  render(OfxImportView, { global: { plugins: [pinia, i18n] } });
 
     const fileInput = screen.getByTestId('ofx-file-input') as HTMLInputElement;
     const file = new File([sampleOfx], 'transactions.ofx', { type: 'application/x-ofx' });

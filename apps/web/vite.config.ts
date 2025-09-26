@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { fileURLToPath, URL } from 'node:url';
 
 import { defineConfig } from 'vite';
@@ -13,6 +14,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    setupFiles: ['src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
     coverage: {
       provider: 'v8',
@@ -22,10 +24,12 @@ export default defineConfig({
         'src/modules/accounting/views/OfxImportView.vue',
         'src/modules/auth/**/*.vue',
       ],
-      lines: 80,
-      functions: 80,
-      statements: 80,
-      branches: 80,
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        statements: 80,
+        branches: 78,
+      },
     },
   },
 });

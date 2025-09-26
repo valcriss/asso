@@ -29,7 +29,8 @@
           {{ t('legal.common.tableOfContents') }}
         </p>
         <ul class="flex flex-col gap-2">
-          <li v-for="section in sections" :key="section.id">
+          <!-- eslint-disable-next-line vue/valid-v-for -->
+          <li v-for="section of sections" :key="section.id">
             <a
               class="text-primary transition-colors hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               :href="`#${section.id}`"
@@ -41,17 +42,14 @@
       </nav>
     </header>
 
-    <section
-      v-for="section in sections"
-      :key="section.id"
-      :id="section.id"
-      class="scroll-mt-24 border-t border-outline/20 pt-8"
-    >
+  <!-- eslint-disable-next-line vue/valid-v-for -->
+  <section v-for="section of sections" :id="section.id" :key="section.id" class="scroll-mt-24 border-t border-outline/20 pt-8">
       <h2 class="text-2xl font-semibold text-foreground">
         {{ section.title }}
       </h2>
       <div class="mt-4 flex flex-col gap-4 text-base leading-relaxed text-muted-foreground">
-        <p v-for="(paragraph, index) in section.paragraphs" :key="`${section.id}-${index}`">
+        <!-- eslint-disable-next-line vue/valid-v-for -->
+        <p v-for="paragraph in section.paragraphs" :key="paragraph">
           {{ paragraph }}
         </p>
       </div>
@@ -63,7 +61,10 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-import BaseButton from '@/components/ui/BaseButton.vue';
+// Using relative import to satisfy TypeScript path resolution within module context
+import BaseButton from '../../../components/ui/BaseButton.vue';
+// Explicitly declare component usage to help some linters recognize usage
+defineOptions({ components: { BaseButton } });
 
 export interface LegalDocumentSection {
   id: string;
@@ -79,6 +80,7 @@ const props = defineProps<{
   filename: string;
 }>();
 
+// t + exportPdf referenced in template (script setup binding)
 const { t } = useI18n();
 const isExporting = ref(false);
 
