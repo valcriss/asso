@@ -7,7 +7,7 @@
         </span>
         <span class="flex flex-col text-left leading-tight">
           <span class="text-base font-semibold">Asso</span>
-          <span class="text-xs text-muted-foreground">Gestion &amp; Comptabilité</span>
+          <span class="text-xs text-muted-foreground">{{ t('app.tagline') }}</span>
         </span>
       </RouterLink>
     </header>
@@ -19,11 +19,19 @@
     </main>
 
     <footer class="mx-auto mt-auto w-full max-w-md py-6 text-center text-xs text-muted-foreground">
-      &copy; {{ new Date().getFullYear() }} Asso. Tous droits réservés.
+      <div class="flex flex-col items-center gap-2">
+        <span>{{ t('app.footer.copyright', { year: new Date().getFullYear() }) }}</span>
+        <AppFooterLinks class="justify-center" />
+      </div>
     </footer>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
 import { RouterLink } from 'vue-router';
+
+import AppFooterLinks from '@/components/layout/AppFooterLinks.vue';
+
+const { t } = useI18n();
 </script>

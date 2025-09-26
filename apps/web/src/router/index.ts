@@ -8,6 +8,7 @@ import { membersRoutes } from '@/modules/members/routes';
 import { projectsRoutes } from '@/modules/projects/routes';
 import { superAdminRoutes } from '@/modules/super-admin/routes';
 import { settingsRoutes } from '@/modules/settings/routes';
+import { legalRoutes } from '@/modules/legal/routes';
 import { useAuthStore, type UserRole } from '@/store';
 
 const routes = [
@@ -19,6 +20,7 @@ const routes = [
   ...projectsRoutes,
   ...settingsRoutes,
   ...superAdminRoutes,
+  ...legalRoutes,
 ];
 
 export function createAppRouter(history: RouterHistory = createWebHistory(import.meta.env.BASE_URL)) {

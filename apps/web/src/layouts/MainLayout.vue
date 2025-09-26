@@ -151,17 +151,7 @@
     <footer class="border-t border-outline bg-surface/80 py-6">
       <div class="app-container flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>{{ t('app.footer.copyright', { year: new Date().getFullYear() }) }}</span>
-        <div class="flex flex-wrap gap-4">
-          <a href="#" class="transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-            {{ t('app.footer.links.legal') }}
-          </a>
-          <a href="#" class="transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-            {{ t('app.footer.links.privacy') }}
-          </a>
-          <a href="#" class="transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-            {{ t('app.footer.links.support') }}
-          </a>
-        </div>
+        <AppFooterLinks class="justify-start sm:justify-end" />
       </div>
     </footer>
   </div>
@@ -174,6 +164,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { useAppStore, useAuthStore, type UserRole } from '@/store';
+import AppFooterLinks from '@/components/layout/AppFooterLinks.vue';
 
 interface NavigationItem {
   labelKey: string;

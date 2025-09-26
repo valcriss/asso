@@ -5,8 +5,9 @@
     "footer": {
       "copyright": "© {year} Asso. All rights reserved.",
       "links": {
-        "legal": "Legal notices",
+        "terms": "Terms of service",
         "privacy": "Privacy policy",
+        "dpa": "Data Processing Agreement",
         "support": "Support"
       }
     },
@@ -25,7 +26,8 @@
     }
   },
   "auth": {
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "loginCTA": "Sign in"
   },
   "common": {
     "loading": "Loading…",
@@ -72,5 +74,145 @@
   "layout": {
     "openNavigation": "Open navigation",
     "close": "Close"
+  },
+  "legal": {
+    "actions": {
+      "downloadPdf": "Download as PDF"
+    },
+    "common": {
+      "lastUpdated": "Last updated: {date}",
+      "tableOfContents": "Table of contents"
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "description": "These terms govern access to the Asso platform and outline the respective responsibilities of associations and the publisher.",
+      "fileName": "asso-terms-en.pdf",
+      "updatedAt": "1 November 2024",
+      "sections": {
+        "scope": {
+          "title": "Purpose and scope",
+          "content": {
+            "p1": "The Asso service is intended for non-profit organizations that need to manage bookkeeping and members.",
+            "p2": "Using the platform implies full acceptance of these terms and of all related policies.",
+            "p3": "Features may evolve to comply with regulations and to meet customer expectations."
+          }
+        },
+        "accounts": {
+          "title": "Account creation and access",
+          "content": {
+            "p1": "The organization administrator is responsible for the accuracy of the information provided during onboarding.",
+            "p2": "Each user keeps their credentials confidential and reports any suspicious activity without delay.",
+            "p3": "Access may be suspended if legal or contractual obligations are breached."
+          }
+        },
+        "services": {
+          "title": "Features and availability",
+          "content": {
+            "p1": "Asso provides accounting, member management, grant tracking and regulatory reporting modules.",
+            "p2": "The service is available around the clock. Scheduled maintenance is announced at least 48 hours in advance.",
+            "p3": "Daily backups are performed to guarantee service continuity and data integrity."
+          }
+        },
+        "responsibilities": {
+          "title": "Responsibilities",
+          "content": {
+            "p1": "Associations remain responsible for the accuracy of the data they enter and for complying with statutory requirements.",
+            "p2": "The publisher implements appropriate security measures and informs the customer about relevant incidents.",
+            "p3": "Indirect damages or lost profits cannot be claimed from the publisher."
+          }
+        },
+        "contact": {
+          "title": "Contact",
+          "content": {
+            "p1": "Questions can be sent to support@asso.example or via the in-app documentation hub."
+          }
+        }
+      }
+    },
+    "privacy": {
+      "title": "Privacy policy",
+      "description": "This policy explains how Asso processes personal data on behalf of customer organizations.",
+      "fileName": "asso-privacy-policy-en.pdf",
+      "updatedAt": "1 November 2024",
+      "sections": {
+        "collection": {
+          "title": "Data collection",
+          "content": {
+            "p1": "Identification, billing and accounting data are collected to deliver the contracted services.",
+            "p2": "Audit logs are retained for three years to preserve the traceability of sensitive operations."
+          }
+        },
+        "use": {
+          "title": "Data usage",
+          "content": {
+            "p1": "Data is used to execute the contract, fulfil legal obligations and continuously improve the platform.",
+            "p2": "Data is never sold. Sub-processors operate under GDPR-compliant agreements."
+          }
+        },
+        "rights": {
+          "title": "Individual rights",
+          "content": {
+            "p1": "Members can exercise their access, rectification, objection and deletion rights through their association or directly with the publisher.",
+            "p2": "Requests are handled within 30 days and tracked in a GDPR request register."
+          }
+        },
+        "security": {
+          "title": "Security and retention",
+          "content": {
+            "p1": "Data is hosted in the European Union with encrypted backups and strict access control.",
+            "p2": "Information is retained for the duration of the contract plus any statutory retention period."
+          }
+        },
+        "contact": {
+          "title": "Contact",
+          "content": {
+            "p1": "Inquiries can be addressed to privacy@asso.example or the Data Protection Officer."
+          }
+        }
+      }
+    },
+    "dpa": {
+      "title": "Data Processing Agreement",
+      "description": "This agreement defines the obligations of the controller (the association) and the processor (Asso).",
+      "fileName": "asso-dpa-en.pdf",
+      "updatedAt": "1 November 2024",
+      "sections": {
+        "purpose": {
+          "title": "Purpose",
+          "content": {
+            "p1": "The agreement governs the processing activities carried out by Asso on behalf of the association in line with GDPR.",
+            "p2": "It applies for the duration of the contract and during the data handover phase."
+          }
+        },
+        "instructions": {
+          "title": "Documented instructions",
+          "content": {
+            "p1": "Asso only processes personal data based on documented instructions from the association.",
+            "p2": "Any request that conflicts with applicable law is escalated to the controller without delay."
+          }
+        },
+        "security": {
+          "title": "Security measures",
+          "content": {
+            "p1": "Appropriate technical and organizational measures prevent accidental destruction, loss or disclosure.",
+            "p2": "Access is restricted to authorized personnel and is comprehensively logged."
+          }
+        },
+        "subprocessors": {
+          "title": "Sub-processing",
+          "content": {
+            "p1": "The association is informed of any additional sub-processor and can raise documented objections.",
+            "p2": "Asso imposes equivalent security and confidentiality requirements on its sub-processors."
+          }
+        },
+        "assistance": {
+          "title": "Assistance and cooperation",
+          "content": {
+            "p1": "Asso supports the association with data subject requests and incident notifications.",
+            "p2": "At the end of the contract, data is either returned or securely deleted according to the association's decision."
+          }
+        }
+      }
+    }
   }
 }
