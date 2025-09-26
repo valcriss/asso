@@ -152,26 +152,74 @@ import { useRoute, useRouter } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { useAppStore, useAuthStore, type UserRole } from '@/store';
 
+interface NavigationItem {
+  label: string;
+  to: string;
+  matchName: string;
+  requiredRoles?: UserRole[];
+  requiresSuperAdmin?: boolean;
+}
+
 const route = useRoute();
 const router = useRouter();
 const appStore = useAppStore();
 const authStore = useAuthStore();
 
-const rawNavigation = computed(() => [
-  { label: 'Tableau de bord', to: '/', matchName: 'dashboard.home', requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[] },
-  { label: 'Comptabilité', to: '/comptabilite', matchName: 'accounting.overview', requiredRoles: ['ADMIN', 'TREASURER'] as UserRole[] },
-  { label: 'Membres', to: '/membres', matchName: 'members.list', requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'] as UserRole[] },
-  { label: 'Subventions', to: '/subventions', matchName: 'grants.list', requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'] as UserRole[] },
+const rawNavigation = computed<NavigationItem[]>(() => [
+  {
+    label: 'Tableau de bord',
+    to: '/',
+    matchName: 'dashboard.home',
+    requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[],
+  },
+  {
+    label: 'Comptabilité',
+    to: '/comptabilite',
+    matchName: 'accounting.overview',
+    requiredRoles: ['ADMIN', 'TREASURER'] as UserRole[],
+  },
+  {
+    label: 'Membres',
+    to: '/membres',
+    matchName: 'members.list',
+    requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'] as UserRole[],
+  },
+  {
+    label: 'Projets',
+    to: '/projets',
+    matchName: 'projects.list',
+    requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[],
+  },
+  {
+    label: 'Subventions',
+    to: '/subventions',
+    matchName: 'grants.list',
+    requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'] as UserRole[],
+  },
   {
     label: 'Portail adhérent',
     to: '/portail/membre',
     matchName: 'members.selfService',
     requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[],
   },
+  {
+    label: 'Supervision',
+    to: '/supervision',
+    matchName: 'superAdmin.panel',
+    requiresSuperAdmin: true,
+  },
 ]);
 
 const navigation = computed(() =>
-  rawNavigation.value.filter((item) => authStore.hasAnyRole(item.requiredRoles)),
+  rawNavigation.value.filter((item) => {
+    if (item.requiresSuperAdmin && !authStore.isSuperAdmin) {
+      return false;
+    }
+    if (!item.requiredRoles) {
+      return true;
+    }
+    return authStore.hasAnyRole(item.requiredRoles);
+  }),
 );
 
 const isSidebarOpen = computed(() => appStore.sidebarOpen);

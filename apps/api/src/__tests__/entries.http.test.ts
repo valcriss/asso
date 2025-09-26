@@ -193,6 +193,7 @@ async function createUserWithRole(role: UserRole) {
     userId: user.id,
     organizationId: organization.id,
     roles: [role],
+    isSuperAdmin: false,
   });
 
   return { organizationId: organization.id, accessToken, userId: user.id };

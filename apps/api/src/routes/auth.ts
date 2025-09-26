@@ -70,6 +70,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         userId: user.id,
         organizationId: organization.id,
         roles,
+        isSuperAdmin: user.isSuperAdmin,
       });
 
       await tx.refreshToken.create({
@@ -93,13 +94,19 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       userId: result.user.id,
       organizationId: result.organization.id,
       roles: result.roles,
+      isSuperAdmin: result.user.isSuperAdmin,
     });
+    const expiresIn = 15 * 60;
+
+    const userPayload = {
+      id: result.user.id,
+      email: result.user.email,
+      roles: result.roles,
+      isSuperAdmin: result.user.isSuperAdmin,
+    };
 
     reply.status(201).send({
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-      },
+      user: userPayload,
       organization: {
         id: result.organization.id,
         name: result.organization.name,
@@ -107,6 +114,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       roles: result.roles,
       accessToken,
       refreshToken: result.refreshToken.token,
+      expiresIn,
     });
   });
 
@@ -115,7 +123,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     const user = await fastify.prisma.user.findUnique({
       where: { email: body.email },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        isSuperAdmin: true,
         roles: {
           where: { organizationId: body.organizationId },
           select: { role: true },
@@ -159,6 +171,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       userId: user.id,
       organizationId: organization.id,
       roles,
+      isSuperAdmin: user.isSuperAdmin,
     });
 
     await fastify.prisma.refreshToken.create({
@@ -174,17 +187,24 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       userId: user.id,
       organizationId: organization.id,
       roles,
+      isSuperAdmin: user.isSuperAdmin,
     });
+    const expiresIn = 15 * 60;
+
+    const userPayload = {
+      id: user.id,
+      email: user.email,
+      roles,
+      isSuperAdmin: user.isSuperAdmin,
+    };
 
     reply.send({
-      user: {
-        id: user.id,
-        email: user.email,
-      },
+      user: userPayload,
       organization,
       roles,
       accessToken,
       refreshToken: refreshToken.token,
+      expiresIn,
     });
   });
 
@@ -234,7 +254,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         }),
         tx.user.findUnique({
           where: { id: decoded.userId },
-          select: { id: true, email: true },
+          select: { id: true, email: true, isSuperAdmin: true },
         }),
         tx.organization.findUnique({
           where: { id: decoded.organizationId },
@@ -260,6 +280,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         userId: user.id,
         organizationId: organization.id,
         roles,
+        isSuperAdmin: user.isSuperAdmin,
       });
 
       const updateResult = await tx.refreshToken.updateMany({
@@ -296,14 +317,24 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         userId: user.id,
         organizationId: organization.id,
         roles,
+        isSuperAdmin: user.isSuperAdmin,
       });
+      const expiresIn = 15 * 60;
+
+      const userPayload = {
+        id: user.id,
+        email: user.email,
+        roles,
+        isSuperAdmin: user.isSuperAdmin,
+      };
 
       return {
-        user,
+        user: userPayload,
         organization,
         roles,
         accessToken,
         refreshToken: refreshToken.token,
+        expiresIn,
       };
     });
 

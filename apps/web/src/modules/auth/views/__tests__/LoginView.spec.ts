@@ -32,7 +32,7 @@ describe('LoginView', () => {
         accessToken: 'access-token',
         refreshToken: 'refresh-token',
         expiresIn: 3600,
-        user: { id: '1', email: 'admin@example.com', roles: ['ADMIN'] },
+        user: { id: '1', email: 'admin@example.com', roles: ['ADMIN'], isSuperAdmin: false },
       }),
     );
     vi.stubGlobal('fetch', fetchMock);
