@@ -56,4 +56,15 @@ export const accountingRoutes: RouteRecordRaw[] = [
       title: 'Balance comptable',
     },
   },
+  {
+    path: '/comptabilite/import-ofx',
+    name: 'accounting.bank.ofx-import',
+    component: () => import('./views/OfxImportView.vue'),
+    meta: {
+      layout: 'main',
+      requiresAuth: true,
+      requiredRoles: ['ADMIN', 'TREASURER'],
+      title: 'Import OFX',
+    },
+  },
 ];
