@@ -61,17 +61,17 @@
               <td class="px-3 py-2 text-foreground">{{ line.code }}</td>
               <td class="px-3 py-2 text-foreground">{{ line.name }}</td>
               <td class="px-3 py-2 text-foreground">{{ line.type }}</td>
-              <td class="px-3 py-2 text-right text-foreground">{{ line.debit.toFixed(2) }}</td>
-              <td class="px-3 py-2 text-right text-foreground">{{ line.credit.toFixed(2) }}</td>
-              <td class="px-3 py-2 text-right text-foreground">{{ line.balance.toFixed(2) }}</td>
+              <td class="px-3 py-2 text-right text-foreground">{{ formatCurrency(line.debit) }}</td>
+              <td class="px-3 py-2 text-right text-foreground">{{ formatCurrency(line.credit) }}</td>
+              <td class="px-3 py-2 text-right text-foreground">{{ formatCurrency(line.balance) }}</td>
             </tr>
           </tbody>
           <tfoot class="bg-muted/20">
             <tr>
               <td colspan="3" class="px-3 py-2 text-right font-semibold text-foreground">Totaux</td>
-              <td class="px-3 py-2 text-right font-semibold text-foreground">{{ report.totals.debit.toFixed(2) }}</td>
-              <td class="px-3 py-2 text-right font-semibold text-foreground">{{ report.totals.credit.toFixed(2) }}</td>
-              <td class="px-3 py-2 text-right font-semibold text-foreground">{{ report.totals.balance.toFixed(2) }}</td>
+              <td class="px-3 py-2 text-right font-semibold text-foreground">{{ formatCurrency(report.totals.debit) }}</td>
+              <td class="px-3 py-2 text-right font-semibold text-foreground">{{ formatCurrency(report.totals.credit) }}</td>
+              <td class="px-3 py-2 text-right font-semibold text-foreground">{{ formatCurrency(report.totals.balance) }}</td>
             </tr>
           </tfoot>
         </table>
@@ -84,6 +84,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
 import { useAuthStore } from '@/store';
 
 interface FiscalYearOption {
@@ -108,6 +109,7 @@ interface TrialBalanceReport {
 }
 
 const authStore = useAuthStore();
+const { formatCurrency } = useLocaleFormatting();
 const organizationId = computed(() => authStore.organizationId ?? 'demo-org');
 
 const fiscalYears = ref<FiscalYearOption[]>([]);

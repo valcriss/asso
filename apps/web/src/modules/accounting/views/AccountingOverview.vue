@@ -137,6 +137,7 @@ import { RouterLink } from 'vue-router';
 import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
 import { useAuthStore } from '@/store';
 
 interface FiscalDashboardYear {
@@ -165,6 +166,7 @@ interface FiscalDashboardResponse {
 }
 
 const authStore = useAuthStore();
+const { formatDate } = useLocaleFormatting();
 const organizationId = computed(() => authStore.organizationId ?? 'demo-org');
 
 const dashboard = ref<{
@@ -188,10 +190,5 @@ async function loadDashboard() {
   }
   const payload = (await response.json()) as FiscalDashboardResponse;
   dashboard.value = payload.data;
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  return date.toLocaleDateString('fr-FR');
 }
 </script>

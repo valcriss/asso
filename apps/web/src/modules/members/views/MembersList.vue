@@ -23,7 +23,7 @@
       <BaseCard>
         <template #title>Cotisations en retard</template>
         <template #description>Montant cumulé à recouvrer sur les exercices en cours.</template>
-        <p class="text-3xl font-semibold text-destructive">{{ overdueAmount }} €</p>
+        <p class="text-3xl font-semibold text-destructive">{{ formatCurrency(overdueAmount) }}</p>
       </BaseCard>
       <BaseCard>
         <template #title>Relances programmées</template>
@@ -73,7 +73,7 @@
               </template>
             </td>
             <td class="px-6 py-4 font-medium" :class="member.outstandingBalance > 0 ? 'text-destructive' : 'text-foreground'">
-              {{ member.outstandingBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} €
+              {{ formatCurrency(member.outstandingBalance) }}
             </td>
             <td class="px-6 py-4">
               <div class="flex justify-end gap-2">
@@ -107,12 +107,14 @@ import { useRouter } from 'vue-router';
 import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
 
 import { membersDirectory, type MemberProfile } from '../data';
 
 type StatusVariant = 'primary' | 'secondary' | 'accent' | 'outline' | 'success';
 
 const router = useRouter();
+const { formatCurrency, formatDate } = useLocaleFormatting();
 
 const members = computed<MemberProfile[]>(() => membersDirectory);
 
@@ -120,20 +122,11 @@ const activeMembers = computed(() => members.value.filter((member) => member.sta
 const overdueAmount = computed(() =>
   members.value
     .filter((member) => member.outstandingBalance > 0)
-    .reduce((total, member) => total + member.outstandingBalance, 0)
-    .toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    .reduce((total, member) => total + member.outstandingBalance, 0),
 );
 const pendingReminders = computed(() =>
   members.value.reduce((count, member) => count + member.contributions.filter((c) => c.status !== 'paid').length, 0),
 );
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function statusVariant(status: MemberProfile['status']): StatusVariant {
   switch (status) {

@@ -7,6 +7,7 @@ import { grantsRoutes } from '@/modules/grants/routes';
 import { membersRoutes } from '@/modules/members/routes';
 import { projectsRoutes } from '@/modules/projects/routes';
 import { superAdminRoutes } from '@/modules/super-admin/routes';
+import { settingsRoutes } from '@/modules/settings/routes';
 import { useAuthStore, type UserRole } from '@/store';
 
 const routes = [
@@ -16,6 +17,7 @@ const routes = [
   ...membersRoutes,
   ...grantsRoutes,
   ...projectsRoutes,
+  ...settingsRoutes,
   ...superAdminRoutes,
 ];
 

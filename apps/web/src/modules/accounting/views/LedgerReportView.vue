@@ -56,8 +56,8 @@
               {{ account.code }} — {{ account.name }}
             </span>
             <span class="text-muted-foreground">
-              Solde {{ account.balance.toFixed(2) }} € (Débit {{ account.totalDebit.toFixed(2) }} € / Crédit
-              {{ account.totalCredit.toFixed(2) }} €)
+              Solde {{ formatCurrency(account.balance) }} (Débit {{ formatCurrency(account.totalDebit) }} / Crédit
+              {{ formatCurrency(account.totalCredit) }})
             </span>
           </summary>
           <div class="overflow-x-auto px-4 pb-4">
@@ -75,13 +75,13 @@
               </thead>
               <tbody class="divide-y divide-outline/60">
                 <tr v-for="movement in account.movements" :key="movement.lineId">
-                  <td class="px-3 py-2 text-foreground">{{ movement.date }}</td>
+                  <td class="px-3 py-2 text-foreground">{{ formatDate(movement.date) }}</td>
                   <td class="px-3 py-2 text-foreground">{{ movement.journalCode }} — {{ movement.journalName }}</td>
                   <td class="px-3 py-2 text-foreground">{{ movement.reference ?? '—' }}</td>
                   <td class="px-3 py-2 text-foreground">{{ movement.memo ?? '—' }}</td>
-                  <td class="px-3 py-2 text-right text-foreground">{{ movement.debit.toFixed(2) }}</td>
-                  <td class="px-3 py-2 text-right text-foreground">{{ movement.credit.toFixed(2) }}</td>
-                  <td class="px-3 py-2 text-right text-foreground">{{ movement.balance.toFixed(2) }}</td>
+                  <td class="px-3 py-2 text-right text-foreground">{{ formatCurrency(movement.debit) }}</td>
+                  <td class="px-3 py-2 text-right text-foreground">{{ formatCurrency(movement.credit) }}</td>
+                  <td class="px-3 py-2 text-right text-foreground">{{ formatCurrency(movement.balance) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -89,8 +89,8 @@
         </details>
 
         <div class="rounded-xl border border-outline/60 bg-muted/20 p-4 text-sm font-semibold text-foreground">
-          Totaux exercice — Débit : {{ report.totals.debit.toFixed(2) }} € • Crédit :
-          {{ report.totals.credit.toFixed(2) }} €
+          Totaux exercice — Débit : {{ formatCurrency(report.totals.debit) }} • Crédit :
+          {{ formatCurrency(report.totals.credit) }}
         </div>
       </div>
     </BaseCard>
@@ -101,6 +101,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
 import { useAuthStore } from '@/store';
 
 interface FiscalYearOption {
@@ -137,6 +138,7 @@ interface LedgerReport {
 }
 
 const authStore = useAuthStore();
+const { formatCurrency, formatDate } = useLocaleFormatting();
 const organizationId = computed(() => authStore.organizationId ?? 'demo-org');
 
 const fiscalYears = ref<FiscalYearOption[]>([]);

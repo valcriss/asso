@@ -7,15 +7,18 @@
     "@sentry/vue": "8.32.0",
     "pinia": "2.2.6",
     "vue": "3.5.12",
+    "vue-i18n": "9.14.0",
     "vue-router": "4.4.5"
   },
   "devDependencies": {
     "@playwright/test": "1.49.0",
     "@testing-library/user-event": "14.6.1",
     "@testing-library/vue": "8.1.0",
+    "@axe-core/playwright": "4.9.0",
     "@types/node": "22.10.1",
     "@vitejs/plugin-vue": "5.2.1",
     "autoprefixer": "10.4.20",
+    "axe-core": "4.10.0",
     "jsdom": "24.1.0",
     "postcss": "8.4.49",
     "tailwindcss": "3.4.15",

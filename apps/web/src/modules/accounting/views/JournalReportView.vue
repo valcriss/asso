@@ -49,7 +49,7 @@
           <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 class="text-base font-semibold text-foreground">
-                {{ entry.date }} • {{ entry.journal.code }} — {{ entry.journal.name }}
+                {{ formatDate(entry.date) }} • {{ entry.journal.code }} — {{ entry.journal.name }}
               </h3>
               <p class="text-sm text-muted-foreground">
                 Référence : {{ entry.reference ?? 'Non attribuée' }}
@@ -57,7 +57,7 @@
               </p>
             </div>
             <div class="text-sm font-medium text-foreground">
-              Total débit {{ entry.totals.debit.toFixed(2) }} € • Total crédit {{ entry.totals.credit.toFixed(2) }} €
+              Total débit {{ formatCurrency(entry.totals.debit) }} • Total crédit {{ formatCurrency(entry.totals.credit) }}
             </div>
           </div>
 
@@ -76,8 +76,8 @@
                     <span class="font-medium">{{ line.accountCode }}</span>
                     <span class="text-sm text-muted-foreground"> — {{ line.accountName }}</span>
                   </td>
-                  <td class="px-3 py-2 text-right text-foreground">{{ line.debit.toFixed(2) }}</td>
-                  <td class="px-3 py-2 text-right text-foreground">{{ line.credit.toFixed(2) }}</td>
+                  <td class="px-3 py-2 text-right text-foreground">{{ formatCurrency(line.debit) }}</td>
+                  <td class="px-3 py-2 text-right text-foreground">{{ formatCurrency(line.credit) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -85,8 +85,8 @@
         </div>
 
         <div class="rounded-xl border border-outline/60 bg-muted/20 p-4 text-sm font-semibold text-foreground">
-          Totaux exercice — Débit : {{ report.totals.debit.toFixed(2) }} € • Crédit :
-          {{ report.totals.credit.toFixed(2) }} €
+          Totaux exercice — Débit : {{ formatCurrency(report.totals.debit) }} • Crédit :
+          {{ formatCurrency(report.totals.credit) }}
         </div>
       </div>
     </BaseCard>
@@ -97,6 +97,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
 import { useAuthStore } from '@/store';
 
 interface FiscalYearOption {
@@ -130,6 +131,7 @@ interface JournalReport {
 }
 
 const authStore = useAuthStore();
+const { formatCurrency, formatDate } = useLocaleFormatting();
 const organizationId = computed(() => authStore.organizationId ?? 'demo-org');
 
 const fiscalYears = ref<FiscalYearOption[]>([]);

@@ -14,17 +14,17 @@
       <BaseCard>
         <template #title>Cotisations payées</template>
         <template #description>Montant encaissé sur l'exercice en cours.</template>
-        <p class="text-3xl font-semibold text-foreground">{{ paidTotal }} €</p>
+        <p class="text-3xl font-semibold text-foreground">{{ formatCurrency(paidTotal) }}</p>
       </BaseCard>
       <BaseCard>
         <template #title>En attente</template>
         <template #description>Adhésions à valider avant échéance.</template>
-        <p class="text-3xl font-semibold text-accent">{{ pendingTotal }} €</p>
+        <p class="text-3xl font-semibold text-accent">{{ formatCurrency(pendingTotal) }}</p>
       </BaseCard>
       <BaseCard>
         <template #title>Retards critiques</template>
         <template #description>Montant à recouvrer avec relance prioritaire.</template>
-        <p class="text-3xl font-semibold text-destructive">{{ overdueTotal }} €</p>
+        <p class="text-3xl font-semibold text-destructive">{{ formatCurrency(overdueTotal) }}</p>
       </BaseCard>
     </div>
 
@@ -84,7 +84,7 @@
             </td>
             <td class="px-5 py-4 text-muted-foreground">{{ item.label }}</td>
             <td class="px-5 py-4 text-muted-foreground">{{ formatDate(item.dueDate) }}</td>
-            <td class="px-5 py-4 font-semibold text-foreground">{{ item.amount.toFixed(2) }} €</td>
+            <td class="px-5 py-4 font-semibold text-foreground">{{ formatCurrency(item.amount) }}</td>
             <td class="px-5 py-4">
               <BaseBadge :variant="badgeVariant(item.status)" :class="badgeClass(item.status)">
                 {{ badgeLabel(item.status) }}
@@ -126,6 +126,8 @@ import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
+
 import { membersDirectory, type MemberContribution, type MemberProfile } from '../data';
 
 type ContributionRow = {
@@ -145,6 +147,8 @@ type BadgeVariant = 'primary' | 'secondary' | 'accent' | 'outline' | 'success';
 
 const route = useRoute();
 const router = useRouter();
+
+const { formatCurrency, formatDate } = useLocaleFormatting();
 
 const focusedMemberId = computed(() => (route.query.focus as string | undefined) ?? null);
 
@@ -168,35 +172,24 @@ const contributionRows = computed<ContributionRow[]>(() =>
 const paidTotal = computed(() =>
   contributionRows.value
     .filter((row) => row.status === 'paid')
-    .reduce((total, row) => total + row.amount, 0)
-    .toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    .reduce((total, row) => total + row.amount, 0),
 );
 
 const pendingTotal = computed(() =>
   contributionRows.value
     .filter((row) => row.status === 'pending')
-    .reduce((total, row) => total + row.amount, 0)
-    .toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    .reduce((total, row) => total + row.amount, 0),
 );
 
 const overdueTotal = computed(() =>
   contributionRows.value
     .filter((row) => row.status === 'overdue')
-    .reduce((total, row) => total + row.amount, 0)
-    .toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    .reduce((total, row) => total + row.amount, 0),
 );
 
 const overdueItems = computed(() => contributionRows.value.filter((row) => row.status === 'overdue'));
 
 const reminderQueued = ref(false);
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function badgeVariant(status: MemberContribution['status']): BadgeVariant {
   switch (status) {

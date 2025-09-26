@@ -3,43 +3,55 @@
     <header class="border-b border-outline bg-surface/80 backdrop-blur">
       <div class="app-container flex items-center justify-between gap-6 py-4">
         <RouterLink to="/" class="flex items-center gap-3 text-foreground">
-          <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-lg font-semibold text-primary-foreground">
+          <span
+            class="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-lg font-semibold text-primary-foreground"
+            aria-hidden="true"
+          >
             As
           </span>
           <span class="hidden flex-col leading-tight sm:flex">
-            <span class="text-base font-semibold">Asso</span>
-            <span class="text-xs text-muted-foreground">Gestion &amp; Comptabilité</span>
+            <span class="text-base font-semibold">{{ t('app.name') }}</span>
+            <span class="text-xs text-muted-foreground">{{ t('app.tagline') }}</span>
           </span>
         </RouterLink>
 
-        <nav class="hidden items-center gap-6 text-sm font-medium md:flex">
+        <nav
+          :aria-label="t('app.navigation.main')"
+          class="hidden items-center gap-6 text-sm font-medium md:flex"
+        >
           <RouterLink
             v-for="item in navigation"
+            :id="`${navigationId}-link-${item.matchName}`"
             :key="item.to"
             :to="item.to"
-            class="transition-colors hover:text-primary"
-            :class="[currentRouteName === item.matchName ? 'text-primary' : 'text-muted-foreground']"
+            class="rounded-md px-2 py-1 transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            :class="[currentRouteName === item.matchName ? 'text-primary font-semibold' : 'text-muted-foreground']"
           >
-            {{ item.label }}
+            {{ t(item.labelKey) }}
           </RouterLink>
         </nav>
 
         <div class="flex items-center gap-3">
           <BaseButton v-if="canCreateEntry" variant="outline" class="hidden md:inline-flex">
-            Nouvelle écriture
+            {{ t('actions.newEntry') }}
           </BaseButton>
           <button
             type="button"
-            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-outline/80 text-muted-foreground transition-colors hover:text-primary md:hidden"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-outline/80 text-muted-foreground transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:hidden"
+            :aria-expanded="isSidebarOpen"
+            :aria-controls="navigationId"
+            :aria-label="t('layout.openNavigation')"
             @click="toggleSidebar"
           >
-            <span class="sr-only">Ouvrir la navigation</span>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
-          <div v-if="user" class="hidden items-center gap-2 rounded-full border border-outline/70 bg-surface px-3 py-1 text-left text-xs md:flex">
-            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
+          <div
+            v-if="user"
+            class="hidden items-center gap-2 rounded-full border border-outline/70 bg-surface px-3 py-1 text-left text-xs md:flex"
+          >
+            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary" aria-hidden="true">
               {{ userInitials }}
             </span>
             <div class="flex flex-col leading-tight">
@@ -52,10 +64,10 @@
           <button
             v-if="isAuthenticated"
             type="button"
-            class="hidden text-xs font-medium text-muted-foreground transition-colors hover:text-primary md:inline-flex"
+            class="hidden text-xs font-medium text-muted-foreground transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:inline-flex"
             @click="logout"
           >
-            Se déconnecter
+            {{ t('auth.logout') }}
           </button>
         </div>
       </div>
@@ -66,45 +78,49 @@
     </Transition>
 
     <aside
+      :id="navigationId"
       class="fixed inset-y-0 right-0 z-40 flex w-72 flex-col gap-8 border-l border-outline/80 bg-surface px-6 py-8 shadow-soft transition-transform md:hidden"
       :class="[isSidebarOpen ? 'translate-x-0' : 'translate-x-full']"
+      @keydown.esc.prevent="closeSidebar"
     >
       <div class="flex items-center justify-between">
         <div class="flex flex-col">
-          <span class="text-sm font-medium text-muted-foreground">Navigation</span>
-          <span class="text-lg font-semibold text-foreground">Asso</span>
+          <span class="text-sm font-medium text-muted-foreground">{{ t('app.navigation.title') }}</span>
+          <span class="text-lg font-semibold text-foreground">{{ t('app.name') }}</span>
         </div>
         <button
           type="button"
-          class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-outline/80 text-muted-foreground transition-colors hover:text-primary"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-outline/80 text-muted-foreground transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          :aria-label="t('layout.close')"
           @click="closeSidebar"
         >
-          <span class="sr-only">Fermer</span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="m6 18 12-12M6 6l12 12" />
           </svg>
         </button>
       </div>
-      <nav class="flex flex-col gap-3 text-sm font-medium">
+      <nav class="flex flex-col gap-3 text-sm font-medium" :aria-label="t('app.navigation.sidebar')">
         <RouterLink
           v-for="item in navigation"
           :key="item.to"
           :to="item.to"
-          class="rounded-lg px-3 py-2 transition-colors hover:bg-muted/80"
-          :class="[currentRouteName === item.matchName ? 'bg-primary/10 text-primary' : 'text-muted-foreground']"
+          class="rounded-lg px-3 py-2 transition-colors hover:bg-muted/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          :class="[currentRouteName === item.matchName ? 'bg-primary text-primary-foreground' : 'text-muted-foreground']"
           @click="closeSidebar"
         >
-          {{ item.label }}
+          {{ t(item.labelKey) }}
         </RouterLink>
       </nav>
-      <BaseButton v-if="canCreateEntry" variant="primary" class="mt-auto">Nouvelle écriture</BaseButton>
+      <BaseButton v-if="canCreateEntry" variant="primary" class="mt-auto">
+        {{ t('actions.newEntry') }}
+      </BaseButton>
       <button
         v-if="isAuthenticated"
         type="button"
-        class="text-left text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+        class="text-left text-sm font-medium text-muted-foreground transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         @click="logout"
       >
-        Se déconnecter
+        {{ t('auth.logout') }}
       </button>
     </aside>
 
@@ -113,16 +129,16 @@
         v-if="navigation.length"
         class="hidden h-fit rounded-2xl border border-outline/60 bg-surface p-6 shadow-soft md:block"
       >
-        <nav class="flex flex-col gap-2 text-sm font-medium">
-          <p class="text-xs uppercase tracking-wide text-muted-foreground">Navigation</p>
+        <nav class="flex flex-col gap-2 text-sm font-medium" :aria-label="t('app.navigation.sidebar')">
+          <p class="text-xs uppercase tracking-wide text-muted-foreground">{{ t('app.navigation.title') }}</p>
           <RouterLink
             v-for="item in navigation"
             :key="item.to"
             :to="item.to"
-            class="rounded-lg px-3 py-2 transition-colors hover:bg-muted/70"
-            :class="[currentRouteName === item.matchName ? 'bg-primary/10 text-primary' : 'text-muted-foreground']"
+            class="rounded-lg px-3 py-2 transition-colors hover:bg-muted/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            :class="[currentRouteName === item.matchName ? 'bg-primary text-primary-foreground' : 'text-muted-foreground']"
           >
-            {{ item.label }}
+            {{ t(item.labelKey) }}
           </RouterLink>
         </nav>
       </aside>
@@ -134,11 +150,17 @@
 
     <footer class="border-t border-outline bg-surface/80 py-6">
       <div class="app-container flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>&copy; {{ new Date().getFullYear() }} Asso. Tous droits réservés.</span>
+        <span>{{ t('app.footer.copyright', { year: new Date().getFullYear() }) }}</span>
         <div class="flex flex-wrap gap-4">
-          <a href="#" class="transition-colors hover:text-primary">Mentions légales</a>
-          <a href="#" class="transition-colors hover:text-primary">Politique de confidentialité</a>
-          <a href="#" class="transition-colors hover:text-primary">Support</a>
+          <a href="#" class="transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+            {{ t('app.footer.links.legal') }}
+          </a>
+          <a href="#" class="transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+            {{ t('app.footer.links.privacy') }}
+          </a>
+          <a href="#" class="transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+            {{ t('app.footer.links.support') }}
+          </a>
         </div>
       </div>
     </footer>
@@ -147,13 +169,14 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { useAppStore, useAuthStore, type UserRole } from '@/store';
 
 interface NavigationItem {
-  label: string;
+  labelKey: string;
   to: string;
   matchName: string;
   requiredRoles?: UserRole[];
@@ -164,46 +187,55 @@ const route = useRoute();
 const router = useRouter();
 const appStore = useAppStore();
 const authStore = useAuthStore();
+const { t } = useI18n();
+
+const navigationId = 'app-navigation';
 
 const rawNavigation = computed<NavigationItem[]>(() => [
   {
-    label: 'Tableau de bord',
+    labelKey: 'app.navigation.dashboard',
     to: '/',
     matchName: 'dashboard.home',
     requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[],
   },
   {
-    label: 'Comptabilité',
+    labelKey: 'app.navigation.accounting',
     to: '/comptabilite',
     matchName: 'accounting.overview',
     requiredRoles: ['ADMIN', 'TREASURER'] as UserRole[],
   },
   {
-    label: 'Membres',
+    labelKey: 'app.navigation.members',
     to: '/membres',
     matchName: 'members.list',
     requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'] as UserRole[],
   },
   {
-    label: 'Projets',
+    labelKey: 'app.navigation.projects',
     to: '/projets',
     matchName: 'projects.list',
     requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[],
   },
   {
-    label: 'Subventions',
+    labelKey: 'app.navigation.grants',
     to: '/subventions',
     matchName: 'grants.list',
     requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'] as UserRole[],
   },
   {
-    label: 'Portail adhérent',
+    labelKey: 'app.navigation.memberPortal',
     to: '/portail/membre',
     matchName: 'members.selfService',
     requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[],
   },
   {
-    label: 'Supervision',
+    labelKey: 'app.navigation.settings',
+    to: '/parametres',
+    matchName: 'settings.preferences',
+    requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[],
+  },
+  {
+    labelKey: 'app.navigation.supervision',
     to: '/supervision',
     matchName: 'superAdmin.panel',
     requiresSuperAdmin: true,

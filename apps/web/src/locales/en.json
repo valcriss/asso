@@ -1,0 +1,76 @@
+{
+  "app": {
+    "name": "Asso",
+    "tagline": "Management & Accounting",
+    "footer": {
+      "copyright": "© {year} Asso. All rights reserved.",
+      "links": {
+        "legal": "Legal notices",
+        "privacy": "Privacy policy",
+        "support": "Support"
+      }
+    },
+    "navigation": {
+      "title": "Navigation",
+      "main": "Main navigation",
+      "sidebar": "Sidebar navigation",
+      "dashboard": "Dashboard",
+      "accounting": "Accounting",
+      "members": "Members",
+      "projects": "Projects",
+      "grants": "Grants",
+      "memberPortal": "Member portal",
+      "supervision": "Supervision",
+      "settings": "Settings"
+    }
+  },
+  "auth": {
+    "logout": "Sign out"
+  },
+  "common": {
+    "loading": "Loading…",
+    "modal": {
+      "close": "Close"
+    }
+  },
+  "actions": {
+    "newEntry": "New entry",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "settings": {
+    "pageTitle": "Preferences",
+    "pageDescription": "Manage localization and accounting defaults for your workspace.",
+    "sections": {
+      "locale": {
+        "title": "Interface language",
+        "description": "Choose the language used across the application.",
+        "selectLabel": "Language"
+      },
+      "currency": {
+        "title": "Accounting currency",
+        "description": "Amounts are formatted using the selected currency.",
+        "selectLabel": "Currency",
+        "preview": "Preview: {amount} on {date}"
+      }
+    },
+    "options": {
+      "locales": {
+        "fr": "French",
+        "en": "English"
+      },
+      "currencies": {
+        "EUR": "Euro (EUR)",
+        "USD": "US Dollar (USD)",
+        "GBP": "Pound Sterling (GBP)"
+      }
+    },
+    "notifications": {
+      "saved": "Preferences updated"
+    }
+  },
+  "layout": {
+    "openNavigation": "Open navigation",
+    "close": "Close"
+  }
+}
