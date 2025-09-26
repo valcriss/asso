@@ -7,7 +7,7 @@
     "apps/web"
   ],
   "scripts": {
-    "lint": "eslint . --ext .ts,.tsx,.js,.cjs,.mjs,.vue",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
@@ -22,7 +22,9 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.1.6",
     "prettier": "^3.6.2",
-    "vue-eslint-parser": "10.2.0"
+    "vue-eslint-parser": "10.2.0",
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.14.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,cjs,mjs,vue}": [

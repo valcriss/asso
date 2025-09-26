@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import request from 'supertest';
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient, UserRole } from '@prisma/client';
 import buildServer from '../server';
@@ -54,19 +55,17 @@ beforeEach(async () => {
 
 describe('auth routes', () => {
   it('registers a new organization administrator', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/register',
-      payload: {
+    const response = await request(app.server)
+      .post('/api/v1/auth/register')
+      .send({
         email: 'admin@example.org',
         password: 'SuperSecurePass123!',
         organization: { name: 'Demo Org' },
-      },
-    });
+      });
 
-    expect(response.statusCode).toBe(201);
+    expect(response.status).toBe(201);
 
-    const body = response.json();
+    const body = response.body;
 
     expect(body.accessToken).toBeTypeOf('string');
     expect(body.refreshToken).toBeTypeOf('string');
@@ -86,18 +85,16 @@ describe('auth routes', () => {
   it('logs in an existing user with valid credentials', async () => {
     const { organizationId, email, password } = await seedUserWithRole(UserRole.ADMIN);
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/login',
-      payload: {
+    const response = await request(app.server)
+      .post('/api/v1/auth/login')
+      .send({
         email,
         password,
         organizationId,
-      },
-    });
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
+    expect(response.status).toBe(200);
+    const body = response.body;
 
     expect(body.roles).toContain(UserRole.ADMIN);
     expect(body.accessToken).toBeTypeOf('string');
@@ -107,48 +104,42 @@ describe('auth routes', () => {
   it('rejects invalid login attempts', async () => {
     const { organizationId, email } = await seedUserWithRole(UserRole.ADMIN);
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/login',
-      payload: {
+    const response = await request(app.server)
+      .post('/api/v1/auth/login')
+      .send({
         email,
         password: 'WrongPassword123!',
         organizationId,
-      },
-    });
+      });
 
-    expect(response.statusCode).toBe(401);
-    const body = response.json();
+    expect(response.status).toBe(401);
+    const body = response.body;
     expect(body.title).toBe('INVALID_CREDENTIALS');
   });
 
   it('rotates refresh tokens on refresh', async () => {
-    const registerResponse = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/register',
-      payload: {
+    const registerResponse = await request(app.server)
+      .post('/api/v1/auth/register')
+      .send({
         email: 'rotate@example.org',
         password: 'AnotherSecurePass123!',
         organization: { name: 'Rotate Org' },
-      },
-    });
+      });
 
-    const registerBody = registerResponse.json();
+    const registerBody = registerResponse.body;
     const user = await prisma.user.findUniqueOrThrow({
       where: { email: 'rotate@example.org' },
       include: { refreshTokens: true, roles: true },
     });
 
-    const refreshResponse = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/refresh',
-      payload: {
+    const refreshResponse = await request(app.server)
+      .post('/api/v1/auth/refresh')
+      .send({
         refreshToken: registerBody.refreshToken,
-      },
-    });
+      });
 
-    expect(refreshResponse.statusCode).toBe(200);
-    const refreshBody = refreshResponse.json();
+    expect(refreshResponse.status).toBe(200);
+    const refreshBody = refreshResponse.body;
 
     expect(refreshBody.refreshToken).toBeTypeOf('string');
     expect(refreshBody.accessToken).toBeTypeOf('string');
@@ -165,82 +156,66 @@ describe('auth routes', () => {
   });
 
   it('prevents reuse of revoked refresh tokens', async () => {
-    const registerResponse = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/register',
-      payload: {
+    const registerResponse = await request(app.server)
+      .post('/api/v1/auth/register')
+      .send({
         email: 'reuse@example.org',
         password: 'ReuseSecurePass123!',
         organization: { name: 'Reuse Org' },
-      },
-    });
+      });
 
-    const { refreshToken } = registerResponse.json();
+    const { refreshToken } = registerResponse.body;
 
-    const firstRefresh = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/refresh',
-      payload: { refreshToken },
-    });
+    const firstRefresh = await request(app.server)
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken });
 
-    expect(firstRefresh.statusCode).toBe(200);
+    expect(firstRefresh.status).toBe(200);
 
-    const secondRefresh = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/refresh',
-      payload: { refreshToken },
-    });
+    const secondRefresh = await request(app.server)
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken });
 
-    expect(secondRefresh.statusCode).toBe(401);
-    const body = secondRefresh.json();
+    expect(secondRefresh.status).toBe(401);
+    const body = secondRefresh.body;
     expect(body.title).toBe('INVALID_REFRESH_TOKEN');
   });
 
   it('revokes tokens on logout', async () => {
-    const registerResponse = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/register',
-      payload: {
+    const registerResponse = await request(app.server)
+      .post('/api/v1/auth/register')
+      .send({
         email: 'logout@example.org',
         password: 'LogoutSecurePass123!',
         organization: { name: 'Logout Org' },
-      },
-    });
+      });
 
-    const { accessToken, refreshToken } = registerResponse.json();
+    const { accessToken, refreshToken } = registerResponse.body;
 
-    const logoutResponse = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/logout',
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-      },
-      payload: { refreshToken },
-    });
+    const logoutResponse = await request(app.server)
+      .post('/api/v1/auth/logout')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ refreshToken });
 
-    expect(logoutResponse.statusCode).toBe(204);
+    expect(logoutResponse.status).toBe(204);
 
-    const refreshResponse = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/refresh',
-      payload: { refreshToken },
-    });
+    const refreshResponse = await request(app.server)
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken });
 
-    expect(refreshResponse.statusCode).toBe(401);
+    expect(refreshResponse.status).toBe(401);
   });
 
   it('enforces role-based access control', async () => {
-    const adminRegister = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/register',
-      payload: {
+    const adminRegister = await request(app.server)
+      .post('/api/v1/auth/register')
+      .send({
         email: 'admin-role@example.org',
         password: 'AdminRolePass123!',
         organization: { name: 'Role Org' },
-      },
-    });
+      });
 
-    const adminBody = adminRegister.json();
+    const adminBody = adminRegister.body;
     const organizationId = adminBody.organization.id as string;
 
     const viewerPassword = 'ViewerPass123!';
@@ -259,46 +234,33 @@ describe('auth routes', () => {
       },
     });
 
-    const viewerLogin = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/login',
-      payload: {
+    const viewerLogin = await request(app.server)
+      .post('/api/v1/auth/login')
+      .send({
         email: 'viewer@example.org',
         password: viewerPassword,
         organizationId,
-      },
-    });
+      });
 
-    expect(viewerLogin.statusCode).toBe(200);
-    const viewerBody = viewerLogin.json();
+    expect(viewerLogin.status).toBe(200);
+    const viewerBody = viewerLogin.body;
 
-    const authorizedResponse = await app.inject({
-      method: 'GET',
-      url: '/api/v1/test/finance',
-      headers: {
-        authorization: `Bearer ${adminBody.accessToken}`,
-      },
-    });
+    const authorizedResponse = await request(app.server)
+      .get('/api/v1/test/finance')
+      .set('Authorization', `Bearer ${adminBody.accessToken}`);
 
-    expect(authorizedResponse.statusCode).toBe(200);
-    expect(authorizedResponse.json()).toEqual({ ok: true });
+    expect(authorizedResponse.status).toBe(200);
+    expect(authorizedResponse.body).toEqual({ ok: true });
 
-    const forbiddenResponse = await app.inject({
-      method: 'GET',
-      url: '/api/v1/test/finance',
-      headers: {
-        authorization: `Bearer ${viewerBody.accessToken}`,
-      },
-    });
+    const forbiddenResponse = await request(app.server)
+      .get('/api/v1/test/finance')
+      .set('Authorization', `Bearer ${viewerBody.accessToken}`);
 
-    expect(forbiddenResponse.statusCode).toBe(403);
+    expect(forbiddenResponse.status).toBe(403);
 
-    const unauthenticatedResponse = await app.inject({
-      method: 'GET',
-      url: '/api/v1/test/finance',
-    });
+    const unauthenticatedResponse = await request(app.server).get('/api/v1/test/finance');
 
-    expect(unauthenticatedResponse.statusCode).toBe(401);
+    expect(unauthenticatedResponse.status).toBe(401);
   });
 });
 

@@ -10,5 +10,14 @@ export default defineConfig({
       concurrent: false,
     },
     setupFiles: ['src/__tests__/setup.ts'],
+    coverage: {
+      all: true,
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      lines: 80,
+      functions: 80,
+      statements: 80,
+      branches: 80,
+    },
   },
 });
