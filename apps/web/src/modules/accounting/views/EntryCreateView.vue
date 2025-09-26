@@ -60,8 +60,12 @@
               <thead class="bg-muted/50">
                 <tr>
                   <th scope="col" class="px-4 py-2 text-left font-semibold text-muted-foreground">Compte</th>
-                  <th scope="col" class="px-4 py-2 text-left font-semibold text-muted-foreground">Débit (€)</th>
-                  <th scope="col" class="px-4 py-2 text-left font-semibold text-muted-foreground">Crédit (€)</th>
+                  <th scope="col" class="px-4 py-2 text-left font-semibold text-muted-foreground">
+                    Débit ({{ currency }})
+                  </th>
+                  <th scope="col" class="px-4 py-2 text-left font-semibold text-muted-foreground">
+                    Crédit ({{ currency }})
+                  </th>
                   <th scope="col" class="px-4 py-2" />
                 </tr>
               </thead>
@@ -111,8 +115,8 @@
               <tfoot class="bg-muted/30 text-sm text-foreground">
                 <tr>
                   <td class="px-4 py-2 font-semibold">Totaux</td>
-                  <td class="px-4 py-2 font-semibold">{{ totals.debit.toFixed(2) }}</td>
-                  <td class="px-4 py-2 font-semibold">{{ totals.credit.toFixed(2) }}</td>
+                  <td class="px-4 py-2 font-semibold">{{ formatCurrency(totals.debit) }}</td>
+                  <td class="px-4 py-2 font-semibold">{{ formatCurrency(totals.credit) }}</td>
                   <td />
                 </tr>
               </tfoot>
@@ -125,7 +129,7 @@
               L'écriture est équilibrée.
             </span>
             <span v-else class="text-sm text-muted-foreground">
-              Différence actuelle : {{ (totals.debit - totals.credit).toFixed(2) }} €
+              Différence actuelle : {{ formatCurrency(totals.debit - totals.credit) }}
             </span>
           </div>
         </div>
@@ -159,7 +163,8 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import AutocompleteInput from '@/components/ui/AutocompleteInput.vue';
-import { useAuthStore } from '@/store';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
+import { useAppStore, useAuthStore } from '@/store';
 
 interface AccountOption {
   id: string;
@@ -195,6 +200,9 @@ interface DashboardResponse {
 }
 
 const authStore = useAuthStore();
+const appStore = useAppStore();
+const { formatCurrency } = useLocaleFormatting();
+const currency = computed(() => appStore.currency);
 
 const accounts = ref<AccountOption[]>([]);
 const journals = ref<JournalOption[]>([]);

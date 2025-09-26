@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 
 import EntryCreateView from '../EntryCreateView.vue';
+import { createAppI18n } from '@/lib/i18n';
 
 function createMockResponse(body: unknown, ok = true, status = 200) {
   return {
@@ -19,11 +20,13 @@ function createMockResponse(body: unknown, ok = true, status = 200) {
 
 describe('EntryCreateView', () => {
   let pinia: Pinia;
+  let i18n: ReturnType<typeof createAppI18n>;
 
   beforeEach(() => {
     window.localStorage.clear();
     pinia = createPinia();
     setActivePinia(pinia);
+    i18n = createAppI18n();
   });
 
   afterEach(() => {
@@ -86,7 +89,7 @@ describe('EntryCreateView', () => {
 
     render(EntryCreateView, {
       global: {
-        plugins: [pinia],
+        plugins: [pinia, i18n],
       },
     });
 
@@ -170,7 +173,7 @@ describe('EntryCreateView', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(EntryCreateView, {
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia, i18n] },
     });
 
     await screen.findByText('Nouvelle écriture');

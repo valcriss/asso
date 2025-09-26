@@ -58,7 +58,7 @@
           <div class="flex justify-between">
             <dt class="font-medium text-foreground">Solde à régulariser</dt>
             <dd :class="member.outstandingBalance > 0 ? 'text-destructive font-semibold' : ''">
-              {{ member.outstandingBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} €
+              {{ formatCurrency(member.outstandingBalance) }}
             </dd>
           </div>
         </dl>
@@ -101,7 +101,7 @@
               <tr v-for="contribution in member.contributions" :key="contribution.id" class="hover:bg-muted/40">
                 <td class="px-4 py-3 font-medium text-foreground">{{ contribution.label }}</td>
                 <td class="px-4 py-3 text-muted-foreground">{{ formatDate(contribution.dueDate) }}</td>
-                <td class="px-4 py-3 text-muted-foreground">{{ contribution.amount.toFixed(2) }} €</td>
+                <td class="px-4 py-3 text-muted-foreground">{{ formatCurrency(contribution.amount) }}</td>
                 <td class="px-4 py-3">
                   <BaseBadge :variant="contributionBadge(contribution.status)" :class="contributionClass(contribution.status)">
                     {{ contributionLabel(contribution.status) }}
@@ -132,7 +132,7 @@
             class="rounded-xl border border-outline/40 bg-muted/20 p-3"
           >
             <div class="flex items-center justify-between">
-              <span class="font-semibold text-foreground">{{ payment.amount.toFixed(2) }} €</span>
+              <span class="font-semibold text-foreground">{{ formatCurrency(payment.amount) }}</span>
               <span class="text-xs text-muted-foreground">{{ formatDate(payment.date) }}</span>
             </div>
             <p class="text-xs text-muted-foreground">
@@ -154,7 +154,7 @@
         <form class="space-y-4" @submit.prevent="submitPayment">
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="text-sm font-medium text-foreground">
-              Montant (€)
+              Montant ({{ currency }})
               <input
                 v-model.number="paymentForm.amount"
                 type="number"
@@ -236,7 +236,7 @@
             >
               <option disabled value="">Sélectionner un paiement</option>
               <option v-for="payment in member.payments" :key="payment.id" :value="payment.id">
-                {{ formatDate(payment.date) }} · {{ payment.amount.toFixed(2) }} €
+                {{ formatDate(payment.date) }} · {{ formatCurrency(payment.amount) }}
               </option>
             </select>
           </label>
@@ -286,6 +286,8 @@ import { useRoute, useRouter } from 'vue-router';
 import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
+import { useAppStore } from '@/store';
 
 import type { MemberContribution, MemberProfile } from '../data';
 import { membersDirectory } from '../data';
@@ -296,6 +298,10 @@ type BadgeVariant = 'primary' | 'secondary' | 'accent' | 'outline' | 'success';
 
 const route = useRoute();
 const router = useRouter();
+
+const { formatCurrency, formatDate } = useLocaleFormatting();
+const appStore = useAppStore();
+const currency = computed(() => appStore.currency);
 
 const memberId = computed(() => route.params.memberId as string | undefined);
 
@@ -326,14 +332,6 @@ const paymentSuccess = ref(false);
 const receiptSuccess = ref(false);
 const uploadedReceiptName = ref('');
 const receiptInput = ref<HTMLInputElement | null>(null);
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function statusVariant(status: MemberProfile['status']): BadgeVariant {
   switch (status) {

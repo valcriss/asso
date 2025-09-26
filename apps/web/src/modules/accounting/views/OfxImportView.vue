@@ -88,7 +88,7 @@
                 <tr>
                   <th scope="col" class="px-4 py-3 text-left">Date</th>
                   <th scope="col" class="px-4 py-3 text-left">Libellé</th>
-                  <th scope="col" class="px-4 py-3 text-right">Montant (€)</th>
+                  <th scope="col" class="px-4 py-3 text-right">Montant ({{ currency }})</th>
                   <th scope="col" class="px-4 py-3 text-left">Suggestion</th>
                   <th scope="col" class="px-4 py-3" />
                 </tr>
@@ -327,6 +327,8 @@ import { computed, reactive, ref, watch } from 'vue';
 import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
+import { useAppStore } from '@/store';
 
 type ImportStep = 'upload' | 'analyse' | 'review' | 'reconcile';
 
@@ -446,6 +448,10 @@ const existingLedgerEntries: LedgerEntryCandidate[] = [
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const currentStep = ref<ImportStep>('upload');
+const { formatCurrency, formatDate, locale } = useLocaleFormatting();
+const appStore = useAppStore();
+const currency = computed(() => appStore.currency);
+
 const importState = reactive({
   status: 'idle' as 'idle' | 'reading' | 'analysing' | 'ready',
   fileName: '',
@@ -778,15 +784,11 @@ function selectTransaction(transactionId: string) {
 }
 
 function formatAmount(amount: number): string {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
-}
-
-function formatDate(date: string): string {
-  return new Intl.DateTimeFormat('fr-FR', { year: 'numeric', month: 'long', day: '2-digit' }).format(new Date(date));
+  return formatCurrency(amount);
 }
 
 function formatHistoryDate(date: string): string {
-  return new Intl.DateTimeFormat('fr-FR', {
+  return new Intl.DateTimeFormat(locale.value, {
     year: 'numeric',
     month: 'short',
     day: '2-digit',

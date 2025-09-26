@@ -24,7 +24,7 @@ const props = withDefaults(
 const badgeClasses = computed(() => {
   switch (props.variant) {
     case 'accent':
-      return 'bg-accent/20 text-accent border border-accent/30';
+      return 'bg-accent text-accent-foreground border border-accent/60';
     case 'secondary':
       return 'bg-secondary text-secondary-foreground';
     case 'outline':

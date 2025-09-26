@@ -1,0 +1,76 @@
+{
+  "app": {
+    "name": "Asso",
+    "tagline": "Gestion & Comptabilité",
+    "footer": {
+      "copyright": "© {year} Asso. Tous droits réservés.",
+      "links": {
+        "legal": "Mentions légales",
+        "privacy": "Politique de confidentialité",
+        "support": "Support"
+      }
+    },
+    "navigation": {
+      "title": "Navigation",
+      "main": "Navigation principale",
+      "sidebar": "Navigation latérale",
+      "dashboard": "Tableau de bord",
+      "accounting": "Comptabilité",
+      "members": "Membres",
+      "projects": "Projets",
+      "grants": "Subventions",
+      "memberPortal": "Portail adhérent",
+      "supervision": "Supervision",
+      "settings": "Paramètres"
+    }
+  },
+  "auth": {
+    "logout": "Se déconnecter"
+  },
+  "common": {
+    "loading": "Chargement…",
+    "modal": {
+      "close": "Fermer"
+    }
+  },
+  "actions": {
+    "newEntry": "Nouvelle écriture",
+    "save": "Enregistrer",
+    "cancel": "Annuler"
+  },
+  "settings": {
+    "pageTitle": "Préférences",
+    "pageDescription": "Configurez la langue et la devise utilisées dans l'application.",
+    "sections": {
+      "locale": {
+        "title": "Langue de l'interface",
+        "description": "Choisissez la langue utilisée dans l'interface.",
+        "selectLabel": "Langue"
+      },
+      "currency": {
+        "title": "Devise comptable",
+        "description": "Les montants sont formatés avec la devise sélectionnée.",
+        "selectLabel": "Devise",
+        "preview": "Aperçu : {amount} au {date}"
+      }
+    },
+    "options": {
+      "locales": {
+        "fr": "Français",
+        "en": "Anglais"
+      },
+      "currencies": {
+        "EUR": "Euro (EUR)",
+        "USD": "Dollar américain (USD)",
+        "GBP": "Livre sterling (GBP)"
+      }
+    },
+    "notifications": {
+      "saved": "Préférences mises à jour"
+    }
+  },
+  "layout": {
+    "openNavigation": "Ouvrir la navigation",
+    "close": "Fermer"
+  }
+}

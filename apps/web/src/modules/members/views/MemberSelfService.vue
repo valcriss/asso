@@ -22,7 +22,7 @@
         <template #title>Solde</template>
         <template #description>Montant restant à régler sur vos cotisations.</template>
         <p :class="member.outstandingBalance > 0 ? 'text-destructive' : 'text-foreground'" class="text-3xl font-semibold">
-          {{ member.outstandingBalance.toFixed(2) }} €
+          {{ formatCurrency(member.outstandingBalance) }}
         </p>
       </BaseCard>
       <BaseCard>
@@ -51,7 +51,7 @@
               <tr v-for="invoice in member.invoices" :key="invoice.id" class="hover:bg-muted/40">
                 <td class="px-4 py-3 font-medium text-foreground">{{ invoice.label }}</td>
                 <td class="px-4 py-3 text-muted-foreground">{{ formatDate(invoice.dueDate) }}</td>
-                <td class="px-4 py-3 text-muted-foreground">{{ invoice.amount.toFixed(2) }} €</td>
+                <td class="px-4 py-3 text-muted-foreground">{{ formatCurrency(invoice.amount) }}</td>
                 <td class="px-4 py-3">
                   <BaseBadge :variant="invoiceBadge(invoice.status)" :class="invoiceClass(invoice.status)">
                     {{ invoiceLabel(invoice.status) }}
@@ -82,7 +82,7 @@
             class="flex items-center justify-between rounded-xl border border-outline/40 bg-muted/20 px-4 py-3"
           >
             <div>
-              <p class="font-semibold text-foreground">{{ payment.amount.toFixed(2) }} €</p>
+              <p class="font-semibold text-foreground">{{ formatCurrency(payment.amount) }}</p>
               <p class="text-xs text-muted-foreground">{{ formatDate(payment.date) }} · {{ payment.method }}</p>
             </div>
             <a
@@ -150,6 +150,7 @@ import { reactive, ref } from 'vue';
 import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
 
 import type { MemberInvoice, MemberProfile } from '../data';
 import { membersDirectory } from '../data';
@@ -160,6 +161,8 @@ type InvoiceStatus = MemberInvoice['status'];
 
 const member = membersDirectory[0];
 
+const { formatCurrency, formatDate } = useLocaleFormatting();
+
 const updateForm = reactive({
   email: member.email,
   phone: member.phone,
@@ -167,14 +170,6 @@ const updateForm = reactive({
 });
 
 const updateSuccess = ref(false);
-
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
 
 function statusVariant(status: MemberProfile['status']): BadgeVariant {
   switch (status) {

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { createPinia, setActivePinia } from 'pinia';
 
 import OfxImportView from '../OfxImportView.vue';
+import { createAppI18n } from '@/lib/i18n';
 
 const sampleOfx = `
 <OFX>
@@ -36,14 +37,18 @@ const sampleOfx = `
 `;
 
 describe('OfxImportView', () => {
+  let i18n: ReturnType<typeof createAppI18n>;
+  let pinia: ReturnType<typeof createPinia>;
+
   beforeEach(() => {
     window.localStorage.clear();
-    const pinia = createPinia();
+    pinia = createPinia();
     setActivePinia(pinia);
+    i18n = createAppI18n();
   });
 
   it('affiche la progression et les transactions importées', async () => {
-    render(OfxImportView);
+    render(OfxImportView, { global: { plugins: [pinia, i18n] } });
 
     const fileInput = screen.getByTestId('ofx-file-input') as HTMLInputElement;
     const file = new File([sampleOfx], 'transactions.ofx', { type: 'application/x-ofx' });
@@ -60,7 +65,7 @@ describe('OfxImportView', () => {
   });
 
   it('permet de lettrer manuellement et journalise l\'action', async () => {
-    render(OfxImportView);
+    render(OfxImportView, { global: { plugins: [pinia, i18n] } });
 
     const fileInput = screen.getByTestId('ofx-file-input') as HTMLInputElement;
     const file = new File([sampleOfx], 'transactions.ofx', { type: 'application/x-ofx' });
