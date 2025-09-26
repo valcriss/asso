@@ -16,6 +16,7 @@ import memberReminderPlugin from './plugins/member-reminders';
 import objectStoragePlugin from './plugins/object-storage';
 import antivirusPlugin from './plugins/antivirus';
 import emailPlugin from './plugins/email';
+import notificationsPlugin from './plugins/notifications';
 import requestLoggerPlugin from './plugins/request-logger';
 import sentryPlugin from './plugins/sentry';
 import metricsPlugin from './plugins/metrics';
@@ -133,6 +134,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(memberReminderPlugin);
   await app.register(antivirusPlugin);
   await app.register(emailPlugin);
+  await app.register(notificationsPlugin);
   await app.register(objectStoragePlugin);
 
   if (config.METRICS_ENABLED) {
