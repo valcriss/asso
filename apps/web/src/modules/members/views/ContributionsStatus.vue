@@ -128,7 +128,7 @@ import BaseCard from '@/components/ui/BaseCard.vue';
 
 import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
 
-import { membersDirectory, type MemberContribution, type MemberProfile } from '../data';
+import { membersDirectory, type MemberContribution } from '../data';
 
 type ContributionRow = {
   id: string;
