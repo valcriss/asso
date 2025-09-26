@@ -162,6 +162,12 @@ const rawNavigation = computed(() => [
   { label: 'Comptabilité', to: '/comptabilite', matchName: 'accounting.overview', requiredRoles: ['ADMIN', 'TREASURER'] as UserRole[] },
   { label: 'Membres', to: '/membres', matchName: 'members.list', requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'] as UserRole[] },
   { label: 'Subventions', to: '/subventions', matchName: 'grants.list', requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY'] as UserRole[] },
+  {
+    label: 'Portail adhérent',
+    to: '/portail/membre',
+    matchName: 'members.selfService',
+    requiredRoles: ['ADMIN', 'TREASURER', 'SECRETARY', 'VIEWER'] as UserRole[],
+  },
 ]);
 
 const navigation = computed(() =>
