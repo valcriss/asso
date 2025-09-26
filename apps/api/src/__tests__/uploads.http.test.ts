@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import request from 'supertest';
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { Prisma, PrismaClient, UserRole } from '@prisma/client';
 import buildServer from '../server';
 import {
   applyTenantContext,
@@ -129,9 +129,7 @@ describe('uploads HTTP routes', () => {
     expect(storedObjects[0]?.versionId).toBe('v1');
     expect(storedObjects[0]?.key).toContain(`/entries/${entry.id}/`);
 
-    const attachmentInDb = await prisma.attachment.findFirst({
-      where: { organizationId },
-    });
+    const attachmentInDb = await findAttachment(organizationId, { organizationId });
 
     expect(attachmentInDb?.sha256).toBe(expectedHash);
     expect(attachmentInDb?.byteSize).toBe(fileBuffer.length);
@@ -154,7 +152,7 @@ describe('uploads HTTP routes', () => {
 
     expect(response.statusCode).toBe(422);
     expect(response.body.title).toBe('FILE_INFECTED');
-    expect(await prisma.attachment.count()).toBe(0);
+    expect(await countAttachments(organizationId)).toBe(0);
     expect(storedObjects).toHaveLength(0);
   });
 
@@ -178,7 +176,7 @@ describe('uploads HTTP routes', () => {
     expect(response.body.data.sha256).toBe(expectedHash);
     expect(storedObjects[0]?.key).toContain(`/projects/${project.id}/`);
 
-    const stored = await prisma.attachment.findFirst({ where: { projectId: project.id } });
+    const stored = await findAttachment(organizationId, { projectId: project.id });
     expect(stored?.entryId).toBeNull();
     expect(stored?.sha256).toBe(expectedHash);
   });
@@ -209,6 +207,23 @@ async function createUserWithRole(role: UserRole) {
   });
 
   return { organizationId: organization.id, accessToken };
+}
+
+async function countAttachments(organizationId: string): Promise<number> {
+  return prisma.$transaction(async (tx) => {
+    await applyTenantContext(tx, organizationId);
+    return tx.attachment.count();
+  });
+}
+
+async function findAttachment(
+  organizationId: string,
+  where: Prisma.AttachmentWhereInput
+) {
+  return prisma.$transaction(async (tx) => {
+    await applyTenantContext(tx, organizationId);
+    return tx.attachment.findFirst({ where });
+  });
 }
 
 async function seedEntry(organizationId: string) {

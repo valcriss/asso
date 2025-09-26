@@ -2,7 +2,7 @@ import { JobScheduler, Queue, Worker, type JobsOptions, type Processor, type Wor
 import type { ConnectionOptions, RepeatOptions } from 'bullmq';
 import type { Logger } from 'pino';
 
-export interface ScheduledJobDefinition<Data = Record<string, unknown>, Result = void> {
+export interface ScheduledJobDefinition<Data extends Record<string, unknown> = Record<string, unknown>> {
   /**
    * Unique identifier for the scheduled job definition.
    */
@@ -39,12 +39,15 @@ export interface ScheduledJobDefinition<Data = Record<string, unknown>, Result =
   /**
    * Handler executed when the job runs.
    */
-  processor: Processor<Data, Result>;
+  processor: Processor<Data, void>;
 }
 
-interface RegisteredJob<Data = unknown, Result = unknown> {
-  definition: ScheduledJobDefinition<Data, Result>;
-  queue: Queue<Data, Result>;
+type GenericJobDefinition = ScheduledJobDefinition<Record<string, unknown>>;
+type GenericQueue = Queue<Record<string, unknown>, void, string>;
+
+interface RegisteredJob {
+  definition: GenericJobDefinition;
+  queue: GenericQueue;
 }
 
 export interface JobRunnerOptions {
@@ -76,42 +79,51 @@ export class JobRunner {
 
   async registerScheduledJobs(definitions: ScheduledJobDefinition[]): Promise<void> {
     for (const definition of definitions) {
-      if (this.definitions.has(definition.key)) {
-        throw new Error(`Job definition with key "${definition.key}" already registered`);
-      }
-
-      const queue = new Queue(definition.queueName, { connection: this.connection });
-      await queue.waitUntilReady();
-      const scheduler = new JobScheduler(definition.queueName, { connection: this.connection });
-      await scheduler.waitUntilReady();
-
-      const worker = new Worker(definition.queueName, definition.processor, {
-        connection: this.connection,
-        ...definition.workerOptions,
-      });
-
-      worker.on('failed', (job, error) => {
-        this.logger?.error(
-          {
-            err: error,
-            jobId: job?.id,
-            jobName: job?.name,
-            queue: definition.queueName,
-          },
-          'Scheduled job failed'
-        );
-      });
-
-      this.queues.push(queue);
-      this.schedulers.push(scheduler);
-      this.workers.push(worker);
-      this.definitions.set(definition.key, { definition, queue });
-
-      await this.registerRepeatableJob(scheduler, definition);
+      await this.registerDefinition(definition);
     }
   }
 
-  async runJobNow<Data = Record<string, unknown>>(
+  private async registerDefinition<Data extends Record<string, unknown>>(
+    definition: ScheduledJobDefinition<Data>
+  ): Promise<void> {
+    if (this.definitions.has(definition.key)) {
+      throw new Error(`Job definition with key "${definition.key}" already registered`);
+    }
+
+    const queue = new Queue<Data, void, string>(definition.queueName, { connection: this.connection });
+    await queue.waitUntilReady();
+    const scheduler = new JobScheduler(definition.queueName, { connection: this.connection });
+    await scheduler.waitUntilReady();
+
+    const worker = new Worker<Data, void, string>(definition.queueName, definition.processor, {
+      connection: this.connection,
+      ...definition.workerOptions,
+    });
+
+    worker.on('failed', (job, error) => {
+      this.logger?.error(
+        {
+          err: error,
+          jobId: job?.id,
+          jobName: job?.name,
+          queue: definition.queueName,
+        },
+        'Scheduled job failed'
+      );
+    });
+
+    this.queues.push(queue);
+    this.schedulers.push(scheduler);
+    this.workers.push(worker);
+    this.definitions.set(definition.key, {
+      definition: definition as unknown as GenericJobDefinition,
+      queue: queue as unknown as GenericQueue,
+    });
+
+    await this.registerRepeatableJob(scheduler, definition as unknown as GenericJobDefinition);
+  }
+
+  async runJobNow<Data extends Record<string, unknown> = Record<string, unknown>>(
     key: string,
     data?: Data,
     jobNameSuffix = 'manual'
@@ -121,19 +133,22 @@ export class JobRunner {
       throw new Error(`Unknown job definition with key "${key}"`);
     }
 
+    const definition = registration.definition as ScheduledJobDefinition<Data>;
+    const queue = registration.queue as Queue<Data, void, string>;
+
     const payload =
       data ??
-      ((await registration.definition.buildJobData?.()) as Data | undefined) ??
+      ((await definition.buildJobData?.()) as Data | undefined) ??
       ({} as Data);
 
-    await registration.queue.add(
-      `${registration.definition.name}:${jobNameSuffix}:${Date.now()}`,
-      payload,
-      {
-        removeOnComplete: true,
-        removeOnFail: 100,
-      }
-    );
+    const jobName = `${definition.name}:${jobNameSuffix}:${Date.now()}`;
+
+    await (queue as unknown as {
+      add: (name: string, data: Data, options?: JobsOptions) => Promise<unknown>;
+    }).add(jobName, payload, {
+      removeOnComplete: true,
+      removeOnFail: 100,
+    });
   }
 
   async getRepeatableJobs(key: string) {
@@ -151,15 +166,15 @@ export class JobRunner {
     await Promise.all(this.queues.map((queue) => queue.close()));
   }
 
-  private async registerRepeatableJob<Data>(
+  private async registerRepeatableJob(
     scheduler: JobScheduler,
-    definition: ScheduledJobDefinition<Data>
+    definition: GenericJobDefinition
   ): Promise<void> {
     const targetJobId = this.getRepeatJobId(definition);
 
     await scheduler.removeJobScheduler(targetJobId).catch(() => undefined);
 
-    const jobData = (await definition.buildJobData?.()) ?? ({} as Data);
+    const jobData = (await definition.buildJobData?.()) ?? {};
 
     const repeat: RepeatOptions = {
       pattern: definition.cron,
@@ -186,4 +201,3 @@ export class JobRunner {
     return `${definition.key}:repeat`;
   }
 }
-

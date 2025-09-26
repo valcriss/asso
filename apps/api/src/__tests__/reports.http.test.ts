@@ -242,6 +242,70 @@ describe('accounting reports HTTP routes', () => {
 
     expect(fecExports).toHaveLength(1);
     expect(fecExports[0].checksum).toBe(checksum);
+
+    const audit = await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      return tx.auditLog.findMany({ where: { entity: 'fiscal_year', entityId: fixtures.fiscalYear.id } });
+    });
+    expect(audit.some((a) => a.action === 'FEC_EXPORTED')).toBe(true);
+  });
+
+  it('generates a balance sheet report in JSON and CSV', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+    const fixtures = await seedReportFixtures(organizationId, { lockFiscalYear: false });
+
+    const jsonResponse = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/reports/balance-sheet`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ fiscalYearId: fixtures.fiscalYear.id, format: 'json' });
+    expect(jsonResponse.statusCode).toBe(200);
+    expect(jsonResponse.body.data.fiscalYear.id).toBe(fixtures.fiscalYear.id);
+
+    const csvResponse = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/reports/balance-sheet`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ fiscalYearId: fixtures.fiscalYear.id, format: 'csv' });
+    expect(csvResponse.statusCode).toBe(200);
+    expect(csvResponse.text).toContain('Section;Account Code;Account Name;Balance');
+  });
+
+  it('rejects FEC export if any entry is unbalanced (precheck)', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+    const fixtures = await seedReportFixtures(organizationId, { lockFiscalYear: false });
+
+    // Create an entry then tamper a line to break the balance
+    const creation = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/entries`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        fiscalYearId: fixtures.fiscalYear.id,
+        journalId: fixtures.journal.id,
+        date: '2025-07-01',
+        lines: [
+          { accountId: fixtures.bankAccount.id, debit: '10.00' },
+          { accountId: fixtures.revenueAccount.id, credit: '10.00' },
+        ],
+      });
+    expect(creation.statusCode).toBe(201);
+
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      const line = await tx.entryLine.findFirstOrThrow({ where: { entryId: creation.body.data.id, credit: new Prisma.Decimal('10.00') } });
+      await tx.entryLine.update({ where: { id: line.id }, data: { credit: new Prisma.Decimal('9.99') } });
+    });
+
+    // Lock FY and try to export
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      await tx.fiscalYear.update({ where: { id: fixtures.fiscalYear.id }, data: { lockedAt: new Date() } });
+    });
+
+    const fecResponse = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/reports/fec`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ fiscalYearId: fixtures.fiscalYear.id });
+    expect(fecResponse.statusCode).toBe(422);
+    expect(fecResponse.body.title).toBe('FEC_PRECHECK_FAILED');
   });
 
   it('rejects FEC export when the fiscal year is not locked', async () => {
@@ -419,11 +483,12 @@ async function seedReportFixtures(organizationId: string, options: ReportFixture
           reference,
           memo,
           lines: {
-            create: lines.map((line) => ({
+            create: lines.map((line, position) => ({
               organizationId,
               accountId: line.accountId,
               debit: new Prisma.Decimal(line.debit ?? '0'),
               credit: new Prisma.Decimal(line.credit ?? '0'),
+              position,
             })),
           },
         },

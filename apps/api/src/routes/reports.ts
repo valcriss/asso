@@ -3,17 +3,21 @@ import { z } from 'zod';
 import { UserRole } from '@prisma/client';
 import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
 import { HttpProblemError } from '../lib/problem-details';
+import { appendPdfComment } from '../lib/pdf/comments';
 import {
   getJournalReport,
   generateFecReport,
   getIncomeStatementReport,
   getLedgerReport,
+  getBalanceSheetReport,
   getTrialBalanceReport,
   type JournalReport,
   type IncomeStatementReport,
   type LedgerReport,
   type TrialBalanceReport,
+  type BalanceSheetReport,
 } from '../modules/accounting/reports';
+import { writeAuditLog } from '../modules/audit/service';
 
 const organizationParamsSchema = z.object({
   orgId: z.string().uuid(),
@@ -37,6 +41,7 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
     UserRole.VIEWER
   );
   const requireFecRole = fastify.authorizeRoles(UserRole.ADMIN, UserRole.TREASURER);
+  const requireBalanceSheetRole = requireReportRole;
 
   fastify.get(
     '/orgs/:orgId/reports/journal',
@@ -153,6 +158,44 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   fastify.get(
+    '/orgs/:orgId/reports/balance-sheet',
+    { preHandler: requireBalanceSheetRole },
+    async (request, reply) => {
+      const { orgId } = organizationParamsSchema.parse(request.params);
+      const query = reportQuerySchema.parse(request.query);
+      ensureOrganizationAccess(request.user?.organizationId, orgId);
+
+      const report = await getBalanceSheetReport(request.prisma, orgId, query.fiscalYearId);
+
+      if (query.format === 'json') {
+        return { data: report };
+      }
+
+      if (query.format === 'csv') {
+        const csv = formatBalanceSheetCsv(report);
+        reply
+          .type('text/csv; charset=utf-8')
+          .header(
+            'Content-Disposition',
+            `attachment; filename="balance-sheet-${report.fiscalYear.label}.csv"`
+          )
+          .send(csv);
+        return;
+      }
+
+      const watermarkText = query.watermark === 'copy' ? 'Copy' : undefined;
+      const pdf = await formatBalanceSheetPdf(report, { watermarkText });
+      reply
+        .type('application/pdf')
+        .header(
+          'Content-Disposition',
+          `attachment; filename="balance-sheet-${report.fiscalYear.label}.pdf"`
+        )
+        .send(Buffer.from(pdf));
+    }
+  );
+
+  fastify.get(
     '/orgs/:orgId/reports/income',
     { preHandler: requireReportRole },
     async (request, reply) => {
@@ -200,6 +243,16 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
 
       const report = await generateFecReport(request.prisma, orgId, query.fiscalYearId);
 
+      await writeAuditLog(
+        request.prisma,
+        orgId,
+        request.user?.id ?? null,
+        'FEC_EXPORTED',
+        'fiscal_year',
+        report.fiscalYear.id,
+        { checksum: report.checksum, rowCount: report.rowCount }
+      );
+
       reply
         .type('text/csv; charset=utf-8')
         .header(
@@ -245,6 +298,26 @@ function formatTrialBalanceCsv(report: TrialBalanceReport): string {
     ['TOTAL', '', formatAmount(report.totals.debit), formatAmount(report.totals.credit), formatAmount(report.totals.balance)].join(';')
   );
   return [header, ...lines].join('\n');
+}
+
+function formatBalanceSheetCsv(report: import('../modules/accounting/reports').BalanceSheetReport): string {
+  const header = 'Section;Account Code;Account Name;Balance';
+  const rows: string[] = [];
+
+  const pushSection = (section: { type: string; rows: Array<{ code: string; name: string; balance: number }>; total: number }) => {
+    for (const row of section.rows) {
+      rows.push([section.type, row.code, row.name, formatAmount(row.balance)].join(';'));
+    }
+    rows.push([section.type, 'TOTAL', '', formatAmount(section.total)].join(';'));
+  };
+
+  pushSection(report.assets);
+  pushSection(report.liabilities);
+  pushSection(report.equity);
+  rows.push(['', 'TOTAL_ASSETS', '', formatAmount(report.totals.assets)].join(';'));
+  rows.push(['', 'TOTAL_LIABILITIES_EQUITY', '', formatAmount(report.totals.liabilitiesAndEquity)].join(';'));
+
+  return [header, ...rows].join('\n');
 }
 
 function formatJournalCsv(report: JournalReport): string {
@@ -477,6 +550,34 @@ async function formatIncomeStatementPdf(
   );
 }
 
+async function formatBalanceSheetPdf(
+  report: BalanceSheetReport,
+  options: PdfFormatOptions = {}
+): Promise<Uint8Array> {
+  const rows: string[][] = [];
+
+  const pushSection = (title: string, section: { rows: Array<{ code: string; name: string; balance: number }>; total: number }) => {
+    rows.push([title, '', '', '']);
+    for (const row of section.rows) {
+      rows.push([row.code, row.name, formatAmount(row.balance), '']);
+    }
+    rows.push(['TOTAL', '', formatAmount(section.total), '']);
+  };
+
+  pushSection('Assets', report.assets);
+  pushSection('Liabilities', report.liabilities);
+  pushSection('Equity', report.equity);
+  rows.push(['', 'TOTAL_ASSETS', formatAmount(report.totals.assets), '']);
+  rows.push(['', 'TOTAL_LIABILITIES_EQUITY', formatAmount(report.totals.liabilitiesAndEquity), '']);
+
+  return createTablePdf(
+    `Balance Sheet - ${report.fiscalYear.label}`,
+    ['Code', 'Name', 'Balance', ''],
+    rows,
+    options
+  );
+}
+
 async function createTablePdf(
   title: string,
   headers: string[],
@@ -484,6 +585,9 @@ async function createTablePdf(
   options: PdfFormatOptions = {}
 ): Promise<Uint8Array> {
   const document = await PDFDocument.create();
+  if (options.watermarkText) {
+    document.setTitle(`${options.watermarkText} watermark`);
+  }
   const font = await document.embedFont(StandardFonts.Helvetica);
   const watermarkFont = options.watermarkText ? await document.embedFont(StandardFonts.HelveticaBold) : null;
   let page = document.addPage();
@@ -512,7 +616,13 @@ async function createTablePdf(
     applyWatermark(document, options.watermarkText, watermarkFont);
   }
 
-  return document.save();
+  const pdfBytes = await document.save();
+
+  if (!options.watermarkText) {
+    return pdfBytes;
+  }
+
+  return appendPdfComment(pdfBytes, `% Watermark: ${options.watermarkText}`);
 }
 
 function formatAmount(value: number): string {

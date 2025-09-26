@@ -127,6 +127,31 @@
           </RouterLink>
         </div>
       </BaseCard>
+
+      <BaseCard>
+        <template #title>Banque &amp; Rapprochement</template>
+        <template #description>
+          Importez vos relevés OFX et définissez des règles automatiques de normalisation.
+        </template>
+        <ul class="space-y-3 text-sm text-foreground">
+          <li class="flex items-start gap-2">
+            <span class="mt-1 text-primary">•</span>
+            <div>
+              <p class="font-medium">Import OFX</p>
+              <p class="text-muted-foreground">Détectez et lettrer vos transactions bancaires.</p>
+              <RouterLink to="/comptabilite/import-ofx" class="text-primary hover:underline">Aller à l'import OFX</RouterLink>
+            </div>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="mt-1 text-primary">•</span>
+            <div>
+              <p class="font-medium">Règles OFX</p>
+              <p class="text-muted-foreground">Créez des règles de correspondance par motif.</p>
+              <RouterLink to="/comptabilite/regles-ofx" class="text-primary hover:underline">Gérer les règles</RouterLink>
+            </div>
+          </li>
+        </ul>
+      </BaseCard>
     </div>
   </section>
 </template>

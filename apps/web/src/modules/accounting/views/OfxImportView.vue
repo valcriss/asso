@@ -9,6 +9,12 @@
         valider manuellement le lettrage. Les propositions automatiques sont signalées mais restent à confirmer avant
         validation finale.
       </p>
+      <div class="flex items-center gap-3">
+        <RouterLink to="/comptabilite/regles-ofx" class="inline-flex items-center text-sm text-primary hover:underline">
+          Gérer les règles OFX
+        </RouterLink>
+        <BaseBadge variant="outline">Règles actives&nbsp;: {{ activeRulesCount }}</BaseBadge>
+      </div>
     </header>
 
     <BaseCard>
@@ -111,7 +117,7 @@
                     {{ formatAmount(transaction.amount) }}
                   </td>
                   <td class="px-4 py-3 align-top text-sm">
-                    <BaseBadge v-if="transaction.status === 'validated'" variant="success">Lettré</BaseBadge>
+                    <BaseBadge v-if="transaction.status === 'validated'" variant="success">Rapproché</BaseBadge>
                     <BaseBadge v-else-if="transaction.status === 'autoSuggested'" variant="outline">
                       Proposition automatique
                     </BaseBadge>
@@ -197,7 +203,7 @@
             <div class="flex items-center justify-between">
               <h3 class="text-sm font-semibold text-foreground">Suggestions de correspondance</h3>
               <span v-if="selectedTransaction.status === 'validated'" class="text-xs font-medium text-primary">
-                Lettrage confirmé
+                Rapprochement confirmé
               </span>
             </div>
 
@@ -251,9 +257,15 @@
                 </div>
               </article>
             </div>
-            <p v-else class="text-sm text-muted-foreground">
-              Aucun rapprochement proposé. Créez une écriture pour lettrer la transaction.
-            </p>
+            <div v-else class="rounded-lg border border-outline/60 bg-muted/20 p-4 text-sm">
+              <p class="text-muted-foreground">Aucune suggestion disponible pour ce libellé.</p>
+              <RouterLink
+                :to="createRuleLinkForSelected()"
+                class="mt-3 inline-flex items-center text-primary hover:underline"
+              >
+                Créer une règle pour «\u00a0{{ selectedTransaction.label }}\u00a0»
+              </RouterLink>
+            </div>
           </section>
 
           <section class="space-y-3">
@@ -322,13 +334,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch, onMounted } from 'vue';
 
 import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import { useLocaleFormatting } from '@/composables/useLocaleFormatting';
-import { useAppStore } from '@/store';
+import { useAppStore, useAuthStore } from '@/store';
+import { apiFetchJson } from '@/lib/api';
 
 type ImportStep = 'upload' | 'analyse' | 'review' | 'reconcile';
 
@@ -450,6 +463,9 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const currentStep = ref<ImportStep>('upload');
 const { formatCurrency, formatDate, locale } = useLocaleFormatting();
 const appStore = useAppStore();
+const authStore = useAuthStore();
+const organizationId = computed(() => authStore.organizationId ?? '');
+const activeRulesCount = ref(0);
 const currency = computed(() => appStore.currency);
 
 const importState = reactive({
@@ -498,6 +514,10 @@ const summary = computed(() => {
 });
 
 const remainingToValidate = computed(() => transactions.value.filter((transaction) => transaction.status !== 'validated').length);
+
+onMounted(() => {
+  fetchActiveOfxRulesCount();
+});
 
 watch(
   () => transactions.value.length,
@@ -808,5 +828,28 @@ function getSuggestionLabel(suggestionId: string | null): string {
     return '';
   }
   return `${suggestion.reference} — ${formatAmount(suggestion.amount)}`;
+}
+
+async function fetchActiveOfxRulesCount() {
+  if (!organizationId.value) return;
+  try {
+    const data = await apiFetchJson<{ data: Array<{ id: string }> }>(
+      `/api/v1/orgs/${organizationId.value}/bank/ofx-rules?active=true`,
+    );
+    activeRulesCount.value = data.data.length;
+  } catch {
+    activeRulesCount.value = 0;
+  }
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function createRuleLinkForSelected() {
+  const label = selectedTransaction.value?.label ?? '';
+  const pattern = escapeRegex(label);
+  const query = new URLSearchParams({ pattern, normalizedLabel: label });
+  return `/comptabilite/regles-ofx?${query.toString()}`;
 }
 </script>

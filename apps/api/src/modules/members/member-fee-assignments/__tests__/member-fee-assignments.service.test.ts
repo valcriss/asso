@@ -276,13 +276,15 @@ async function createEntryFixture(tx: Prisma.TransactionClient, organizationId: 
             organizationId,
             accountId: debitAccount.id,
             debit: new Prisma.Decimal('120.00'),
+            credit: new Prisma.Decimal('0'),
           },
           {
             organizationId,
             accountId: creditAccount.id,
+            debit: new Prisma.Decimal('0'),
             credit: new Prisma.Decimal('120.00'),
           },
-        ],
+        ].map((line, position) => ({ ...line, position })),
       },
     },
   });

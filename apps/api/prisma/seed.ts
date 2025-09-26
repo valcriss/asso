@@ -155,7 +155,7 @@ async function main() {
               debit: new Prisma.Decimal('0'),
               credit: new Prisma.Decimal('150.00'),
             },
-          ],
+          ].map((line, position) => ({ ...line, position })),
         },
       },
     });
@@ -197,7 +197,7 @@ async function main() {
               debit: new Prisma.Decimal('0'),
               credit: new Prisma.Decimal('320.00'),
             },
-          ],
+          ].map((line, position) => ({ ...line, position })),
         },
       },
     });

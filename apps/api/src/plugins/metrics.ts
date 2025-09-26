@@ -13,7 +13,7 @@ declare module 'fastify' {
   }
 }
 
-const metricsPlugin: FastifyPluginAsync<MetricsPluginOptions> = fp(async (fastify, options) => {
+const metricsPlugin: FastifyPluginAsync<MetricsPluginOptions> = async (fastify, options) => {
   const endpoint = options?.endpoint ?? '/metrics';
   const register = new Registry();
 
@@ -61,6 +61,8 @@ const metricsPlugin: FastifyPluginAsync<MetricsPluginOptions> = fp(async (fastif
     reply.header('Content-Type', register.contentType);
     return register.metrics();
   });
-});
+};
 
-export default metricsPlugin;
+export default fp(metricsPlugin, {
+  name: 'metricsPlugin',
+});

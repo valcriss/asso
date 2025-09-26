@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
-import { createEntryInputSchema } from './schemas';
+import { createEntryInputSchema, reverseEntryInputSchema } from './schemas';
 import { HttpProblemError } from '../../../lib/problem-details';
 
 export type EntryClient = PrismaClient | Prisma.TransactionClient;
@@ -135,18 +135,19 @@ export async function createEntry(
       memo: parsed.memo,
       createdBy: userId,
       lines: {
-        create: parsed.lines.map((line) => ({
+        create: parsed.lines.map((line, position) => ({
           organizationId,
           accountId: line.accountId,
           debit: line.debit,
           credit: line.credit,
           projectId: line.projectId ?? null,
+          position,
         })),
       },
     },
     include: {
       lines: {
-        orderBy: { id: 'asc' },
+        orderBy: { position: 'asc' },
       },
     },
   });
@@ -178,9 +179,110 @@ export async function lockEntry(client: EntryClient, organizationId: string, ent
     data: { lockedAt: new Date() },
     include: {
       lines: {
-        orderBy: { id: 'asc' },
+        orderBy: { position: 'asc' },
       },
     },
+  });
+}
+
+export async function createReversalEntry(
+  client: EntryClient,
+  organizationId: string,
+  userId: string,
+  originalEntryId: string,
+  input: unknown,
+) {
+  const parsed = reverseEntryInputSchema.parse(input);
+
+  const original = await client.entry.findFirst({
+    where: { id: originalEntryId, organizationId },
+    include: { lines: { orderBy: { position: 'asc' } } },
+  });
+
+  if (!original) {
+    throw new HttpProblemError({
+      status: 404,
+      title: 'ENTRY_NOT_FOUND',
+      detail: 'The entry to reverse does not exist in this organization.',
+    });
+  }
+
+  if (!original.lockedAt) {
+    throw new HttpProblemError({
+      status: 409,
+      title: 'ENTRY_NOT_LOCKED',
+      detail: 'Only locked entries can be reversed.',
+    });
+  }
+
+  const fiscalYear = await client.fiscalYear.findFirst({
+    where: { id: parsed.fiscalYearId, organizationId },
+  });
+  if (!fiscalYear) {
+    throw new HttpProblemError({
+      status: 404,
+      title: 'FISCAL_YEAR_NOT_FOUND',
+      detail: 'The target fiscal year does not exist for this organization.',
+    });
+  }
+  if (fiscalYear.lockedAt) {
+    throw new HttpProblemError({
+      status: 403,
+      title: 'FISCAL_YEAR_LOCKED',
+      detail: 'The target fiscal year is locked and cannot accept new entries.',
+    });
+  }
+  const entryDate = parsed.date;
+  if (entryDate < fiscalYear.startDate || entryDate > fiscalYear.endDate) {
+    throw new HttpProblemError({
+      status: 422,
+      title: 'ENTRY_DATE_OUT_OF_RANGE',
+      detail: 'Entry date must fall within the target fiscal year boundaries.',
+    });
+  }
+
+  const journalId = parsed.journalId ?? original.journalId;
+  const journal = await client.journal.findFirst({ where: { id: journalId, organizationId } });
+  if (!journal) {
+    throw new HttpProblemError({
+      status: 404,
+      title: 'JOURNAL_NOT_FOUND',
+      detail: 'The specified journal does not exist for this organization.',
+    });
+  }
+
+  const sequenceValue = await reserveSequenceNumber(client, {
+    organizationId,
+    fiscalYearId: fiscalYear.id,
+    journalId: journal.id,
+  });
+  const reference = formatEntryReference(journal.code, fiscalYear.startDate, sequenceValue);
+
+  const memo = parsed.memo
+    ? parsed.memo
+    : `Reversal of ${original.reference ?? original.id}`;
+
+  return client.entry.create({
+    data: {
+      organizationId,
+      fiscalYearId: fiscalYear.id,
+      journalId: journal.id,
+      date: entryDate,
+      reference,
+      memo,
+      createdBy: userId,
+      lines: {
+        create: original.lines.map((line, position) => ({
+          organizationId,
+          accountId: line.accountId,
+          debit: line.credit,
+          credit: line.debit,
+          projectId: line.projectId ?? null,
+          position,
+        })),
+      },
+    },
+    include: { lines: { orderBy: { position: 'asc' } } },
   });
 }
 

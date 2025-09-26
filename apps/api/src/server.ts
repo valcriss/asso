@@ -20,6 +20,7 @@ import notificationsPlugin from './plugins/notifications';
 import requestLoggerPlugin from './plugins/request-logger';
 import sentryPlugin from './plugins/sentry';
 import metricsPlugin from './plugins/metrics';
+import lateOnRequestPlugin from './plugins/late-on-request';
 import { parseConfig, type AppConfig, type RawEnvConfig } from './config';
 import { getTenantIdentifier } from './lib/http/tenant';
 
@@ -29,7 +30,7 @@ if (process.env.NODE_ENV !== 'production') {
   if (!process.env.FASTIFY_AUTOLOAD_TYPESCRIPT) {
     process.env.FASTIFY_AUTOLOAD_TYPESCRIPT = '1';
   }
-  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('esbuild-register');
 }
 
@@ -136,6 +137,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(emailPlugin);
   await app.register(notificationsPlugin);
   await app.register(objectStoragePlugin);
+  await app.register(lateOnRequestPlugin);
 
   if (config.METRICS_ENABLED) {
     await app.register(metricsPlugin, {

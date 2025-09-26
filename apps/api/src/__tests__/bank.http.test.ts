@@ -264,17 +264,15 @@ describe('bank routes', () => {
 
     const bankAccountId = bankAccountResponse.body.data.id as string;
 
+    // Create a rule via API instead of direct DB insert
+    const ruleResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/ofx-rules`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ normalizedLabel: 'Cotisation annuelle', pattern: 'ADH[ÉE]SION', priority: 10 });
+    expect(ruleResponse.statusCode).toBe(201);
+
     await prisma.$transaction(async (tx) => {
       await applyTenantContext(tx, organizationId);
-      await tx.ofxRule.create({
-        data: {
-          organizationId,
-          normalizedLabel: 'Cotisation annuelle',
-          pattern: 'ADH[ÉE]SION',
-          priority: 10,
-        },
-      });
-
       await tx.bankTransaction.create({
         data: {
           organizationId,
@@ -314,6 +312,67 @@ describe('bank routes', () => {
     expect(transactions).toHaveLength(2);
     expect(transactions.some((txn) => txn.fitId === 'FIT-001')).toBe(true);
     expect(transactions.some((txn) => txn.fitId === 'FIT-002')).toBe(true);
+  });
+
+  it('manages OFX rules (list/create/update/delete)', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+    const fixtures = await seedBankingFixtures(organizationId);
+
+    const bankAccountResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/accounts`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        accountId: fixtures.bankLedgerAccount.id,
+        name: 'Compte primaire',
+        iban: VALID_IBAN,
+        bic: 'AGRIFRPP',
+      });
+    expect(bankAccountResponse.statusCode).toBe(201);
+    const bankAccountId = bankAccountResponse.body.data.id as string;
+
+    // Create with bankAccountId
+    const createResp = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/ofx-rules`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ bankAccountId, pattern: 'COTIS', normalizedLabel: 'Cotisation', priority: 5, isActive: true });
+    expect(createResp.statusCode).toBe(201);
+    const ruleId = createResp.body.data.id as string;
+
+    const auditsAfterCreate = await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      return tx.auditLog.findMany({ where: { entity: 'ofx_rule', entityId: ruleId } });
+    });
+    expect(auditsAfterCreate.some((a) => a.action === 'OFX_RULE_CREATED')).toBe(true);
+
+    // List filtered by active
+    const listActive = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/bank/ofx-rules`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ active: true });
+    expect(listActive.statusCode).toBe(200);
+    expect(listActive.body.data.some((r: { id: string }) => r.id === ruleId)).toBe(true);
+
+    // Update
+    const updateResp = await request(app.server)
+      .patch(`/api/v1/orgs/${organizationId}/bank/ofx-rules/${ruleId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ isActive: false, priority: 1 });
+    expect(updateResp.statusCode).toBe(200);
+    expect(updateResp.body.data.isActive).toBe(false);
+    expect(updateResp.body.data.priority).toBe(1);
+
+    // Delete
+    const deleteResp = await request(app.server)
+      .delete(`/api/v1/orgs/${organizationId}/bank/ofx-rules/${ruleId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(deleteResp.statusCode).toBe(204);
+
+    const listAfterDelete = await request(app.server)
+      .get(`/api/v1/orgs/${organizationId}/bank/ofx-rules`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ bankAccountId: fixtures.bankLedgerAccount.id });
+    expect(listAfterDelete.statusCode).toBe(200);
+    expect(listAfterDelete.body.data.some((r: { id: string }) => r.id === ruleId)).toBe(false);
   });
 
   it('suggests reconciliation candidates with exact and fuzzy rules', async () => {
@@ -395,6 +454,77 @@ describe('bank routes', () => {
     expect(secondSuggestion.entryId).toBe(fuzzyEntryResponse.body.data.id);
     expect(secondSuggestion.matchType).toBe('FUZZY');
     expect(secondSuggestion.similarity).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('confirms reconciliation and flags bank ledger line', async () => {
+    const { organizationId, accessToken } = await createUserWithRole(UserRole.TREASURER);
+    const fixtures = await seedBankingFixtures(organizationId);
+
+    const bankAccountResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/accounts`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        accountId: fixtures.bankLedgerAccount.id,
+        name: 'Compte Reco Confirm',
+        iban: VALID_IBAN,
+        bic: 'AGRIFRPP',
+      });
+    const bankAccountId = bankAccountResponse.body.data.id as string;
+
+    const entryResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/entries`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        fiscalYearId: fixtures.fiscalYear.id,
+        journalId: fixtures.journal.id,
+        date: '2025-01-12',
+        memo: 'Encaissement cotisation',
+        lines: [
+          { accountId: fixtures.bankLedgerAccount.id, debit: '150.00' },
+          { accountId: fixtures.revenueAccount.id, credit: '150.00' },
+        ],
+      });
+    expect(entryResponse.statusCode).toBe(201);
+    const entryId = entryResponse.body.data.id as string;
+
+    const transaction = await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      return tx.bankTransaction.create({
+        data: {
+          organizationId,
+          bankAccountId,
+          fitId: 'CONF-001',
+          valueDate: new Date('2025-01-12T00:00:00.000Z'),
+          amount: '150.00',
+          rawLabel: 'Cotisation',
+          normalizedLabel: 'Cotisation',
+        },
+      });
+    });
+
+    const confirmResponse = await request(app.server)
+      .post(`/api/v1/orgs/${organizationId}/bank/reconcile/confirm`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ transactionId: transaction.id, entryId });
+    expect(confirmResponse.statusCode).toBe(200);
+    expect(confirmResponse.body.data.transactionId).toBe(transaction.id);
+    expect(confirmResponse.body.data.entryId).toBe(entryId);
+
+    const [updatedTxn, bankLine] = await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      const t = await tx.bankTransaction.findUnique({ where: { id: transaction.id } });
+      const l = await tx.entryLine.findFirst({ where: { entryId, accountId: fixtures.bankLedgerAccount.id } });
+      return [t, l];
+    });
+    expect(updatedTxn?.matchedEntryId).toBe(entryId);
+    expect(bankLine?.reconciledAt).toBeTruthy();
+
+    const audit = await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      return tx.auditLog.findMany({ where: { entity: 'bank_transaction', entityId: transaction.id } });
+    });
+    expect(audit.length).toBeGreaterThanOrEqual(1);
+    expect(audit[0].action).toBe('BANK_RECONCILIATION_CONFIRMED');
   });
 });
 

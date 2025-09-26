@@ -120,6 +120,30 @@ export interface IncomeStatementReport {
   };
 }
 
+export interface BalanceSheetAccountRow {
+  accountId: string;
+  code: string;
+  name: string;
+  balance: number;
+}
+
+export interface BalanceSheetSection {
+  type: 'ASSET' | 'LIABILITY' | 'EQUITY';
+  rows: BalanceSheetAccountRow[];
+  total: number;
+}
+
+export interface BalanceSheetReport {
+  fiscalYear: FiscalYearSummary;
+  assets: BalanceSheetSection;
+  liabilities: BalanceSheetSection;
+  equity: BalanceSheetSection;
+  totals: {
+    assets: number;
+    liabilitiesAndEquity: number;
+  };
+}
+
 export interface FecGenerationResult {
   fiscalYear: FiscalYearSummary;
   csv: string;
@@ -169,7 +193,7 @@ export async function getJournalReport(
         select: { id: true, code: true, name: true },
       },
       lines: {
-        orderBy: { id: 'asc' },
+        orderBy: { position: 'asc' },
         include: {
           account: {
             select: { id: true, code: true, name: true },
@@ -415,6 +439,102 @@ export async function getTrialBalanceReport(
   } satisfies TrialBalanceReport;
 }
 
+export async function getBalanceSheetReport(
+  client: ReportClient,
+  organizationId: string,
+  fiscalYearId: string
+): Promise<BalanceSheetReport> {
+  const fiscalYear = await getFiscalYearOrThrow(client, organizationId, fiscalYearId);
+
+  const accounts = await client.account.findMany({
+    where: { organizationId, type: { in: ['ASSET', 'LIABILITY', 'EQUITY'] } },
+    select: { id: true, code: true, name: true, type: true },
+    orderBy: { code: 'asc' },
+  });
+  if (accounts.length === 0) {
+    return {
+      fiscalYear: toFiscalYearSummary(fiscalYear),
+      assets: { type: 'ASSET', rows: [], total: 0 },
+      liabilities: { type: 'LIABILITY', rows: [], total: 0 },
+      equity: { type: 'EQUITY', rows: [], total: 0 },
+      totals: { assets: 0, liabilitiesAndEquity: 0 },
+    } satisfies BalanceSheetReport;
+  }
+
+  const grouped = await client.entryLine.groupBy({
+    by: ['accountId'],
+    where: { organizationId, entry: { fiscalYearId } },
+    _sum: { debit: true, credit: true },
+  });
+  const sums = new Map(grouped.map((g) => [g.accountId, g]));
+
+  const assetsRows: BalanceSheetAccountRow[] = [];
+  const liabilitiesRows: BalanceSheetAccountRow[] = [];
+  const equityRows: BalanceSheetAccountRow[] = [];
+  let assetsTotal = ZERO;
+  let liabilitiesTotal = ZERO;
+  let equityTotal = ZERO;
+
+  for (const acc of accounts) {
+    const g = sums.get(acc.id);
+    const debit = (g?._sum.debit ?? ZERO) as Prisma.Decimal;
+    const credit = (g?._sum.credit ?? ZERO) as Prisma.Decimal;
+    let balDec: Prisma.Decimal;
+    if (acc.type === 'ASSET') {
+      balDec = debit.sub(credit);
+    } else {
+      // Liability and Equity
+      balDec = credit.sub(debit);
+    }
+
+    const balance = decimalToNumber(balDec);
+    const row: BalanceSheetAccountRow = {
+      accountId: acc.id,
+      code: acc.code,
+      name: acc.name,
+      balance,
+    };
+
+    if (acc.type === 'ASSET') {
+      assetsRows.push(row);
+      assetsTotal = assetsTotal.add(balDec);
+    } else if (acc.type === 'LIABILITY') {
+      liabilitiesRows.push(row);
+      liabilitiesTotal = liabilitiesTotal.add(balDec);
+    } else {
+      equityRows.push(row);
+      equityTotal = equityTotal.add(balDec);
+    }
+  }
+
+  const assetsSection: BalanceSheetSection = {
+    type: 'ASSET',
+    rows: assetsRows,
+    total: decimalToNumber(assetsTotal),
+  };
+  const liabilitiesSection: BalanceSheetSection = {
+    type: 'LIABILITY',
+    rows: liabilitiesRows,
+    total: decimalToNumber(liabilitiesTotal),
+  };
+  const equitySection: BalanceSheetSection = {
+    type: 'EQUITY',
+    rows: equityRows,
+    total: decimalToNumber(equityTotal),
+  };
+
+  return {
+    fiscalYear: toFiscalYearSummary(fiscalYear),
+    assets: assetsSection,
+    liabilities: liabilitiesSection,
+    equity: equitySection,
+    totals: {
+      assets: decimalToNumber(assetsTotal),
+      liabilitiesAndEquity: decimalToNumber(liabilitiesTotal.add(equityTotal)),
+    },
+  } satisfies BalanceSheetReport;
+}
+
 export async function getIncomeStatementReport(
   client: ReportClient,
   organizationId: string,
@@ -506,6 +626,25 @@ export async function generateFecReport(
       status: 403,
       title: 'FISCAL_YEAR_NOT_LOCKED',
       detail: 'FEC export requires a locked fiscal year.',
+    });
+  }
+
+  // Pre‑export validation: ensure all entries are balanced
+  const groupedByEntry = await client.entryLine.groupBy({
+    by: ['entryId'],
+    where: { organizationId, entry: { fiscalYearId } },
+    _sum: { debit: true, credit: true },
+  });
+  const unbalanced = groupedByEntry.filter((g) => {
+    const debit = (g._sum.debit ?? ZERO) as Prisma.Decimal;
+    const credit = (g._sum.credit ?? ZERO) as Prisma.Decimal;
+    return !debit.equals(credit);
+  });
+  if (unbalanced.length > 0) {
+    throw new HttpProblemError({
+      status: 422,
+      title: 'FEC_PRECHECK_FAILED',
+      detail: 'One or more entries are not balanced. Please fix before exporting the FEC.',
     });
   }
 

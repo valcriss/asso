@@ -67,4 +67,15 @@ export const accountingRoutes: RouteRecordRaw[] = [
       title: 'Import OFX',
     },
   },
+  {
+    path: '/comptabilite/regles-ofx',
+    name: 'accounting.bank.ofx-rules',
+    component: () => import('./views/OfxRulesView.vue'),
+    meta: {
+      layout: 'main',
+      requiresAuth: true,
+      requiredRoles: ['ADMIN', 'TREASURER'],
+      title: 'Règles OFX',
+    },
+  },
 ];

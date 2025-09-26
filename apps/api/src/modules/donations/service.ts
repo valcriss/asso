@@ -237,8 +237,8 @@ async function reserveDonationReceiptNumber(
 ): Promise<number> {
   const result = await client.$queryRaw<{ current_value: bigint | number }[]>(
     Prisma.sql`
-      INSERT INTO "donation_receipt_sequence" ("organization_id", "fiscal_year_id", "next_value")
-      VALUES (${params.organizationId}::uuid, ${params.fiscalYearId}::uuid, 2)
+      INSERT INTO "donation_receipt_sequence" ("organization_id", "fiscal_year_id", "next_value", "updated_at")
+      VALUES (${params.organizationId}::uuid, ${params.fiscalYearId}::uuid, 2, NOW())
       ON CONFLICT ("organization_id", "fiscal_year_id")
       DO UPDATE SET "next_value" = "donation_receipt_sequence"."next_value" + 1, "updated_at" = NOW()
       RETURNING "next_value" - 1 AS current_value

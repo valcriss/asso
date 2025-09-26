@@ -39,6 +39,7 @@ model Organization {
   donationReceiptSequences DonationReceiptSequence[]
   projects                Project[]
   projectPeriods          ProjectPeriod[]
+  auditLogs               AuditLog[]
 
   @@map("organization")
 }
@@ -250,6 +251,8 @@ model EntryLine {
   credit         Decimal      @default(0) @db.Decimal(16, 2)
   projectId      String?      @map("project_id") @db.Uuid
   memberId       String?      @map("member_id") @db.Uuid
+  position       Int          @map("position")
+  reconciledAt   DateTime?    @map("reconciled_at")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -416,6 +419,7 @@ model User {
   updatedAt     DateTime       @updatedAt @map("updated_at")
   roles         UserOrgRole[]
   refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
 
   @@map("user")
 }
@@ -545,4 +549,21 @@ model Donation {
   @@index([organizationId, fiscalYearId], map: "donation_org_fiscal_year_idx")
   @@index([organizationId, receivedAt], map: "donation_org_received_idx")
   @@map("donation")
+}
+
+model AuditLog {
+  id             String       @id @default(dbgenerated("uuid_generate_v7()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String?      @map("user_id") @db.Uuid
+  action         String
+  entity         String
+  entityId       String        @map("entity_id")
+  payloadJson    Json?         @map("payload_json")
+  at             DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, at], map: "audit_log_org_at_idx")
+  @@index([organizationId, entity, entityId], map: "audit_log_org_entity_idx")
+  @@map("audit_log")
 }

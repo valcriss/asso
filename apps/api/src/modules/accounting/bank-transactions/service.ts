@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { HttpProblemError } from '../../../lib/problem-details';
 import type { ParsedOfxTransaction } from './ofx-parser';
 import { parseOfxTransactions } from './ofx-parser';
-import { importOfxInputSchema, reconcileSuggestionsInputSchema } from './schemas';
+import { importOfxInputSchema, reconcileSuggestionsInputSchema, confirmReconciliationInputSchema } from './schemas';
 
 export type BankTransactionClient = PrismaClient | Prisma.TransactionClient;
 
@@ -294,6 +294,80 @@ export async function getReconciliationSuggestions(
     transactionId: transaction.id,
     suggestions,
   };
+}
+
+export interface ConfirmReconciliationResult {
+  transactionId: string;
+  entryId: string;
+}
+
+export async function confirmReconciliation(
+  client: BankTransactionClient,
+  organizationId: string,
+  input: unknown
+): Promise<ConfirmReconciliationResult> {
+  const parsed = parseInput(confirmReconciliationInputSchema, input, 'Invalid reconciliation confirmation payload.');
+
+  const transaction = await client.bankTransaction.findFirst({
+    where: { id: parsed.transactionId, organizationId },
+    select: { id: true, bankAccountId: true, amount: true, matchedEntryId: true },
+  });
+  if (!transaction) {
+    throw new HttpProblemError({ status: 404, title: 'BANK_TRANSACTION_NOT_FOUND', detail: 'The bank transaction was not found.' });
+  }
+  if (transaction.matchedEntryId) {
+    throw new HttpProblemError({ status: 409, title: 'BANK_TRANSACTION_ALREADY_MATCHED', detail: 'This transaction is already matched.' });
+  }
+
+  const entry = await client.entry.findFirst({
+    where: { id: parsed.entryId, organizationId },
+    select: { id: true, fiscalYearId: true, journalId: true, lines: { select: { id: true, accountId: true, debit: true, credit: true } } },
+  });
+  if (!entry) {
+    throw new HttpProblemError({ status: 404, title: 'ENTRY_NOT_FOUND', detail: 'The specified entry was not found.' });
+  }
+
+  // Find the bank ledger account for the transaction's bank account
+  const bankAccount = await client.bankAccount.findFirst({
+    where: { id: transaction.bankAccountId, organizationId },
+    select: { accountId: true },
+  });
+  if (!bankAccount) {
+    throw new HttpProblemError({ status: 404, title: 'BANK_ACCOUNT_NOT_FOUND', detail: 'Related bank account was not found.' });
+  }
+
+  // Sum entry lines on the bank ledger to compare with transaction amount
+  const ledgerLines = entry.lines.filter((l) => l.accountId === bankAccount.accountId);
+  if (ledgerLines.length === 0) {
+    throw new HttpProblemError({ status: 422, title: 'ENTRY_MISSING_BANK_LINE', detail: 'Entry has no line for the reconciled bank ledger.' });
+  }
+
+  const ledgerAmount = ledgerLines.reduce(
+    (sum, l) => sum.add(l.debit).sub(l.credit),
+    new PrismaNamespace.Decimal(0)
+  );
+
+  if (!ledgerAmount.equals(transaction.amount)) {
+    // Manual override allowed by product; still warn via 422 unless you want to relax.
+    throw new HttpProblemError({
+      status: 422,
+      title: 'RECONCILIATION_AMOUNT_MISMATCH',
+      detail: 'The entry bank line amount does not match the transaction amount.',
+    });
+  }
+
+  await client.bankTransaction.update({
+    where: { id: transaction.id },
+    data: { matchedEntryId: entry.id },
+  });
+
+  // Flag bank ledger lines as reconciled
+  await client.entryLine.updateMany({
+    where: { entryId: entry.id, accountId: bankAccount.accountId },
+    data: { reconciledAt: new Date() },
+  });
+
+  return { transactionId: transaction.id, entryId: entry.id };
 }
 
 function prepareTransactions(parsed: ParsedOfxTransaction[]): PreparedTransaction[] {

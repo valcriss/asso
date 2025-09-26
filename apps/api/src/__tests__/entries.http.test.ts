@@ -169,6 +169,14 @@ describe('entries HTTP routes', () => {
 
     expect(secondLock.statusCode).toBe(409);
     expect(secondLock.body.title).toBe('ENTRY_ALREADY_LOCKED');
+
+    // Audit log created on first lock
+    const audits = await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, organizationId);
+      return tx.auditLog.findMany({ where: { entity: 'entry', entityId: entryId } });
+    });
+    expect(audits.length).toBeGreaterThanOrEqual(1);
+    expect(audits[0].action).toBe('ENTRY_LOCKED');
   });
 });
 

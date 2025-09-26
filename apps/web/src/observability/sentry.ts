@@ -10,7 +10,6 @@ export function installSentry({ app }: SentryOptions): void {
 
   if (!dsn) {
     if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
       console.info('[sentry] Disabled because no DSN was provided.');
     }
 

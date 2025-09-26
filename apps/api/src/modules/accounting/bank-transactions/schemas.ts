@@ -17,3 +17,10 @@ export const reconcileSuggestionsInputSchema = z.object({
 
 export type ImportOfxInput = z.infer<typeof importOfxInputSchema>;
 export type ReconcileSuggestionsInput = z.infer<typeof reconcileSuggestionsInputSchema>;
+
+export const confirmReconciliationInputSchema = z.object({
+  transactionId: z.string().uuid(),
+  entryId: z.string().uuid(),
+});
+
+export type ConfirmReconciliationInput = z.infer<typeof confirmReconciliationInputSchema>;
