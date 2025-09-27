@@ -34,7 +34,7 @@
 
       <BaseCard>
         <template #icon>
-          <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent">
+          <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent-foreground">
             <span class="text-2xl">🤝</span>
           </span>
         </template>

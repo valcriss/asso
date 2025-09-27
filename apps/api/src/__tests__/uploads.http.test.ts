@@ -28,6 +28,8 @@ let app: FastifyInstance;
 let prisma: PrismaClient;
 let storedObjects: StoredObject[];
 let nextScanResult: AntivirusScanResult | null;
+let stubStorage: ObjectStorage;
+let stubAntivirus: AntivirusScanner;
 
 beforeAll(async () => {
   process.env.JWT_ACCESS_SECRET = TEST_ACCESS_SECRET;
@@ -53,7 +55,7 @@ beforeAll(async () => {
   storedObjects = [];
   nextScanResult = null;
 
-  const stubStorage: ObjectStorage = {
+  stubStorage = {
     async putObject({ key, body, contentType }) {
       const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
       const versionId = `v${storedObjects.length + 1}`;
@@ -65,7 +67,7 @@ beforeAll(async () => {
     },
   };
 
-  const stubAntivirus: AntivirusScanner = {
+  stubAntivirus = {
     get isEnabled() {
       return Boolean(nextScanResult);
     },
@@ -99,6 +101,8 @@ afterAll(async () => {
 beforeEach(async () => {
   storedObjects = [];
   nextScanResult = null;
+  app.objectStorage = stubStorage;
+  app.antivirus = stubAntivirus;
   await resetDatabase();
 });
 

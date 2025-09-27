@@ -132,4 +132,3 @@ async function seedAccountingFixtures(organizationId: string) {
     return { fy2025, fy2026, journal, bank, revenue };
   });
 }
-

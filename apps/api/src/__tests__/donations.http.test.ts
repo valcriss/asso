@@ -26,6 +26,7 @@ interface StoredObject {
 let app: FastifyInstance;
 let prisma: PrismaClient;
 let storedObjects: StoredObject[];
+let stubStorage: ObjectStorage;
 
 beforeAll(async () => {
   process.env.JWT_ACCESS_SECRET = TEST_ACCESS_SECRET;
@@ -48,7 +49,7 @@ beforeAll(async () => {
   await app.ready();
 
   storedObjects = [];
-  const stubStorage: ObjectStorage = {
+  stubStorage = {
     async putObject({ key, body, contentType }) {
       const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
       const versionId = `v${storedObjects.length + 1}`;
@@ -75,6 +76,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   storedObjects = [];
+  app.objectStorage = stubStorage;
   await resetDatabase();
 });
 

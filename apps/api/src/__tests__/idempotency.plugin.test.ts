@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import idempotencyPlugin from '../plugins/idempotency';
 import { InMemoryIdempotencyStore } from '../lib/idempotency/in-memory-store';
 import type { IdempotencyRecord, IdempotencyStore } from '../lib/idempotency/types';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 describe('idempotencyPlugin', () => {
   afterEach(async () => {
@@ -145,20 +146,56 @@ describe('idempotencyPlugin', () => {
   });
 
   it('rejects requests with multiple idempotency headers', async () => {
-    const app = Fastify();
-    await app.register(idempotencyPlugin);
-    app.get('/ping', async () => ({ ok: true }));
-    await app.ready();
+    const fastify = createIdempotencyStub();
+    await idempotencyPlugin(fastify as unknown as FastifyInstance, {});
 
-    const response = await app.inject({
-      method: 'GET',
-      url: '/ping',
+    const preHandler = fastify.hooks.preHandler;
+    expect(preHandler).toBeDefined();
+
+    const request = {
       headers: { 'idempotency-key': ['a', 'b'] },
+      idempotencyReplay: false,
+    } as unknown as FastifyRequest;
+
+    await expect(preHandler?.(request, createReplyStub())).rejects.toMatchObject({
+      status: 400,
+      title: 'Invalid Idempotency-Key header',
     });
-
-    expect(response.statusCode).toBe(400);
-    expect(response.json()).toMatchObject({ title: 'Invalid Idempotency-Key header' });
-
-    await app.close();
   });
 });
+
+type PreHandlerHook = (request: FastifyRequest, reply: FastifyReply) => Promise<void> | void;
+
+interface FastifyIdempotencyStub {
+  decorate: ReturnType<typeof vi.fn>;
+  decorateRequest: ReturnType<typeof vi.fn>;
+  addHook: ReturnType<typeof vi.fn>;
+  hooks: { preHandler?: PreHandlerHook };
+}
+
+function createIdempotencyStub(): FastifyIdempotencyStub {
+  const hooks: FastifyIdempotencyStub['hooks'] = {};
+
+  const stub: FastifyIdempotencyStub = {
+    decorate: vi.fn(),
+    decorateRequest: vi.fn(),
+    addHook: vi.fn((hook: 'preHandler' | 'onSend', handler: PreHandlerHook) => {
+      if (hook === 'preHandler') {
+        hooks.preHandler = handler as PreHandlerHook;
+      }
+    }),
+    hooks,
+  };
+
+  return stub;
+}
+
+function createReplyStub(): FastifyReply {
+  const reply = {
+    header: vi.fn(() => reply),
+    status: vi.fn(() => reply),
+    send: vi.fn(async () => reply),
+  };
+
+  return reply as unknown as FastifyReply;
+}

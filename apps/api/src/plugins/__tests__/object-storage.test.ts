@@ -84,6 +84,10 @@ function createFastify(configOverrides: Partial<Record<string, unknown>>): Fasti
     hooks,
   };
 
+  stub.decorate.mockImplementation((name: 'objectStorage', value: ObjectStorage) => {
+    (stub as unknown as Record<string, unknown>)[name] = value;
+  });
+
   return stub;
 }
 

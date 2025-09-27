@@ -19,7 +19,7 @@
       <BaseCard>
         <template #title>En attente</template>
         <template #description>Adhésions à valider avant échéance.</template>
-        <p class="text-3xl font-semibold text-accent">{{ formatCurrency(pendingTotal) }}</p>
+        <p class="text-3xl font-semibold text-accent-foreground">{{ formatCurrency(pendingTotal) }}</p>
       </BaseCard>
       <BaseCard>
         <template #title>Retards critiques</template>
@@ -207,7 +207,7 @@ function badgeClass(status: MemberContribution['status']) {
     return 'border-destructive/60 text-destructive';
   }
   if (status === 'pending') {
-    return 'border-accent/40 text-accent';
+    return 'border-accent/40 text-accent-foreground';
   }
   return '';
 }

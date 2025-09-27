@@ -349,7 +349,7 @@ function statusClass(status: MemberProfile['status']) {
     return 'border-destructive/60 text-destructive';
   }
   if (status === 'EN_ATTENTE') {
-    return 'border-accent/40 text-accent';
+    return 'border-accent/40 text-accent-foreground';
   }
   return '';
 }
@@ -383,7 +383,7 @@ function contributionClass(status: ContributionStatus) {
     return 'border-destructive/60 text-destructive';
   }
   if (status === 'pending') {
-    return 'border-accent/40 text-accent';
+    return 'border-accent/40 text-accent-foreground';
   }
   return '';
 }

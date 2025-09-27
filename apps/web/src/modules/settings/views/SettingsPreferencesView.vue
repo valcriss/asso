@@ -50,7 +50,7 @@
         <BaseButton type="button" variant="ghost" @click="resetPreferences">
           {{ t('actions.cancel') }}
         </BaseButton>
-        <span v-if="feedbackMessage" class="text-sm text-accent" role="status" aria-live="polite">
+        <span v-if="feedbackMessage" class="text-sm text-accent-foreground" role="status" aria-live="polite">
           {{ feedbackMessage }}
         </span>
       </div>
