@@ -1,10 +1,30 @@
 import { randomUUID } from 'node:crypto';
+import { config as loadEnv } from 'dotenv';
+import { resolve } from 'node:path';
+
+// Ensure root monorepo .env is loaded (../../ from apps/api points to repo root).
+// Then load local .env (apps/api/.env) if present without overriding existing vars.
+const ROOT_ENV_PATH = resolve(process.cwd(), '../../.env');
+loadEnv({ path: ROOT_ENV_PATH, override: false });
+loadEnv({ override: false });
 import { readFile, readdir } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Client as PgClient } from 'pg';
 import { Prisma, PrismaClient } from '@prisma/client';
 
-export const ADMIN_ROOT_URL = 'postgresql://postgres:postgres@localhost:5432/postgres';
+// Build an admin (superuser) connection URL dynamically so tests work with the
+// credentials defined in the root .env / docker-compose instead of assuming
+// the default 'postgres:postgres'. The official Postgres image promotes the
+// POSTGRES_USER to superuser, so using those vars keeps superuser capabilities
+// needed for creating/dropping databases & roles during tests.
+const PG_SUPERUSER = process.env.POSTGRES_SUPERUSER || process.env.POSTGRES_USER || 'postgres';
+const PG_SUPERPASS = process.env.POSTGRES_SUPERPASS || process.env.POSTGRES_PASSWORD || 'postgres';
+console.debug('[test-db-helper] admin credentials user=%s (override vars present=%s)', PG_SUPERUSER, Boolean(process.env.POSTGRES_USER));
+const PG_PORT = process.env.POSTGRES_PORT || '5432';
+// Always target the maintenance DB 'postgres' (safer than the app DB name which may be dropped/recreated).
+const PG_MAINTENANCE_DB = process.env.POSTGRES_MAINTENANCE_DB || 'postgres';
+export const ADMIN_ROOT_URL = `postgresql://${PG_SUPERUSER}:${PG_SUPERPASS}@localhost:${PG_PORT}/${PG_MAINTENANCE_DB}`;
 export const APP_ROLE = 'app_user';
 export const APP_PASSWORD = 'app_user_password';
 
@@ -100,7 +120,10 @@ export async function applyTenantContext(tx: Prisma.TransactionClient, organizat
 }
 
 function buildAdminDatabaseUrl(name: string): string {
-  return `postgresql://postgres:postgres@localhost:5432/${name}`;
+  const PG_SUPERUSER = process.env.POSTGRES_SUPERUSER || process.env.POSTGRES_USER || 'postgres';
+  const PG_SUPERPASS = process.env.POSTGRES_SUPERPASS || process.env.POSTGRES_PASSWORD || 'postgres';
+  const PG_PORT = process.env.POSTGRES_PORT || '5432';
+  return `postgresql://${PG_SUPERUSER}:${PG_SUPERPASS}@localhost:${PG_PORT}/${name}`;
 }
 
 function buildAppDatabaseUrl(name: string): string {
@@ -153,7 +176,20 @@ async function runMigrations(databaseName: string): Promise<void> {
   await client.connect();
 
   const migrationsDir = join(__dirname, '../../../prisma/migrations');
-  const migrationFolders = (await readdir(migrationsDir)).sort();
+  const entries = await readdir(migrationsDir);
+  const migrationFolders: string[] = [];
+  for (const entry of entries) {
+    if (entry === 'migration_lock.toml') continue;
+    try {
+      const s = await stat(join(migrationsDir, entry));
+      if (s.isDirectory()) {
+        migrationFolders.push(entry);
+      }
+    } catch {
+      // ignore fs errors for unexpected entries
+    }
+  }
+  migrationFolders.sort();
 
   for (const folder of migrationFolders) {
     const sql = await readFile(join(migrationsDir, folder, 'migration.sql'), 'utf8');

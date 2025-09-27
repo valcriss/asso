@@ -292,8 +292,8 @@ async function reserveSequenceNumber(
 ): Promise<number> {
   const result = await client.$queryRaw<{ current_value: bigint | number }[]>(
     Prisma.sql`
-      INSERT INTO "sequence_number" ("organization_id", "fiscal_year_id", "journal_id", "next_value")
-      VALUES (${params.organizationId}::uuid, ${params.fiscalYearId}::uuid, ${params.journalId}::uuid, 2)
+      INSERT INTO "sequence_number" ("organization_id", "fiscal_year_id", "journal_id", "next_value", "created_at", "updated_at")
+      VALUES (${params.organizationId}::uuid, ${params.fiscalYearId}::uuid, ${params.journalId}::uuid, 2, NOW(), NOW())
       ON CONFLICT ("organization_id", "fiscal_year_id", "journal_id")
       DO UPDATE SET "next_value" = "sequence_number"."next_value" + 1, "updated_at" = NOW()
       RETURNING "next_value" - 1 AS current_value

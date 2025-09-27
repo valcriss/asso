@@ -6,6 +6,7 @@ import env from '@fastify/env';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import dotenv from 'dotenv';
+import { existsSync } from 'node:fs';
 import pino from 'pino';
 import idempotencyPlugin from './plugins/idempotency';
 import paginationPlugin from './plugins/pagination';
@@ -24,6 +25,22 @@ import lateOnRequestPlugin from './plugins/late-on-request';
 import { parseConfig, type AppConfig, type RawEnvConfig } from './config';
 import { getTenantIdentifier } from './lib/http/tenant';
 
+// Charge d'abord le .env à la racine du monorepo (utile quand on lance depuis la racine)
+// puis applique un .env spécifique au dossier API (override local si présent).
+// Cette stratégie permet d'éviter la duplication des variables communes tout en
+// laissant la possibilité de surcharger localement pour l'API uniquement.
+(() => {
+  try {
+    const rootEnvPath = join(__dirname, '..', '..', '..', '.env'); // apps/api/src -> ../../../
+    if (existsSync(rootEnvPath)) {
+      dotenv.config({ path: rootEnvPath });
+    }
+  } catch {
+    // silencieux: si erreur de résolution on continue
+  }
+})();
+
+// Ensuite .env local (apps/api/.env) si présent
 dotenv.config();
 
 if (process.env.NODE_ENV !== 'production') {

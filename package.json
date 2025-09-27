@@ -7,10 +7,13 @@
     "apps/web"
   ],
   "scripts": {
+    "dev": "node ops/run-dev.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
+    "migrate": "npm run -w @asso/api prisma:migrate",
+    "generate": "npm exec --workspace @asso/api prisma generate",
     "prepare": "husky"
   },
   "devDependencies": {

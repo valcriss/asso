@@ -5,7 +5,7 @@
       <p class="text-sm text-muted-foreground">Accédez à votre espace de gestion associatif.</p>
     </header>
 
-    <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
+    <form v-if="!needsOrgSelection" class="space-y-5" novalidate @submit.prevent="handleSubmit">
       <div class="space-y-1">
         <label for="email" class="text-sm font-medium text-foreground">Adresse e-mail</label>
         <input
@@ -52,6 +52,30 @@
       </button>
     </form>
 
+    <div v-else class="space-y-5">
+      <p class="text-sm text-muted-foreground">
+        Sélectionnez l'organisation à laquelle vous souhaitez vous connecter.
+      </p>
+      <ul class="space-y-2">
+        <li v-for="org in authStore.pendingOrganizations" :key="org.id">
+          <button
+            type="button"
+            class="w-full rounded-xl border border-outline/60 bg-background px-4 py-3 text-left text-sm font-medium text-foreground shadow-soft transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary/20"
+            @click="pickOrganization(org.id)"
+          >
+            {{ org.name }}
+          </button>
+        </li>
+      </ul>
+      <button
+        type="button"
+        class="text-sm text-primary underline underline-offset-4 hover:text-primary/80"
+        @click="resetSelection"
+      >
+        Revenir à l'écran de connexion
+      </button>
+    </div>
+
     <p class="text-center text-sm text-muted-foreground">
       <RouterLink to="/mot-de-passe-oublie" class="font-medium text-primary transition-colors hover:text-primary/80">
         Mot de passe oublié ?
@@ -78,9 +102,9 @@ const form = reactive({
 const isSubmitting = ref(false);
 const errorMessage = ref('');
 
-const canSubmit = computed(() => {
-  return Boolean(form.email.trim()) && Boolean(form.password.trim()) && !isSubmitting.value;
-});
+const canSubmit = computed(() => Boolean(form.email.trim()) && Boolean(form.password.trim()) && !isSubmitting.value);
+
+const needsOrgSelection = computed(() => Boolean(authStore.pendingOrganizations && authStore.pendingOrganizations.length));
 
 async function handleSubmit() {
   if (!canSubmit.value) {
@@ -99,5 +123,25 @@ async function handleSubmit() {
   } finally {
     isSubmitting.value = false;
   }
+}
+
+async function pickOrganization(organizationId: string) {
+  errorMessage.value = '';
+  isSubmitting.value = true;
+  try {
+    // We need to re-send login with email & password + organizationId.
+    await authStore.login({ email: form.email.trim(), password: form.password, organizationId });
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect ? route.query.redirect : '/';
+    await router.push(redirect);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Connexion impossible.';
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+function resetSelection() {
+  authStore.pendingOrganizations = null;
+  errorMessage.value = '';
 }
 </script>

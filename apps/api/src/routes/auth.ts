@@ -17,7 +17,7 @@ const registerBodySchema = z.object({
 const loginBodySchema = z.object({
   email: emailSchema,
   password: z.string().min(1),
-  organizationId: z.string().uuid(),
+  organizationId: z.string().uuid().optional(),
 });
 
 const tokenBodySchema = z.object({
@@ -119,7 +119,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post('/auth/login', async (request, reply) => {
-    const body = parseBody(loginBodySchema, request.body);
+    const body = parseBody(loginBodySchema, request.body, fastify.log);
 
     const user = await fastify.prisma.user.findUnique({
       where: { email: body.email },
@@ -128,44 +128,46 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         email: true,
         passwordHash: true,
         isSuperAdmin: true,
-        roles: {
-          where: { organizationId: body.organizationId },
-          select: { role: true },
-        },
+        roles: { select: { role: true, organizationId: true } },
       },
     });
 
-    if (!user) {
-      throw invalidCredentialsError();
-    }
-
+    if (!user) throw invalidCredentialsError();
     const passwordValid = await verifyPassword(user.passwordHash, body.password);
-    if (!passwordValid) {
-      throw invalidCredentialsError();
+    if (!passwordValid) throw invalidCredentialsError();
+
+    const uniqueOrgIds = [...new Set(user.roles.map((r) => r.organizationId))];
+    if (!body.organizationId) {
+      if (uniqueOrgIds.length === 0) {
+        throw new HttpProblemError({ status: 403, title: 'FORBIDDEN', detail: 'You do not belong to any organization.' });
+      }
+      if (uniqueOrgIds.length > 1) {
+        const organizations = await fastify.prisma.organization.findMany({
+          where: { id: { in: uniqueOrgIds } },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        });
+        return reply.send({
+          user: { id: user.id, email: user.email, isSuperAdmin: user.isSuperAdmin },
+          organizations,
+          requiresOrganizationSelection: true,
+        });
+      }
     }
 
-    if (user.roles.length === 0) {
-      throw new HttpProblemError({
-        status: 403,
-        title: 'FORBIDDEN',
-        detail: 'You do not have access to this organization.',
-      });
+    const organizationId = body.organizationId ?? uniqueOrgIds[0];
+    const roles = user.roles.filter((r) => r.organizationId === organizationId).map((r) => r.role);
+    if (roles.length === 0) {
+      throw new HttpProblemError({ status: 403, title: 'FORBIDDEN', detail: 'You do not have access to this organization.' });
     }
 
     const organization = await fastify.prisma.organization.findUnique({
-      where: { id: body.organizationId },
+      where: { id: organizationId },
       select: { id: true, name: true },
     });
-
     if (!organization) {
-      throw new HttpProblemError({
-        status: 400,
-        title: 'INVALID_ORGANIZATION',
-        detail: 'The specified organization does not exist.',
-      });
+      throw new HttpProblemError({ status: 400, title: 'INVALID_ORGANIZATION', detail: 'The specified organization does not exist.' });
     }
-
-    const roles = user.roles.map((role) => role.role);
 
     const refreshToken = fastify.issueRefreshToken({
       userId: user.id,
@@ -173,7 +175,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       roles,
       isSuperAdmin: user.isSuperAdmin,
     });
-
     await fastify.prisma.refreshToken.create({
       data: {
         id: refreshToken.tokenId,
@@ -182,7 +183,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         expiresAt: refreshToken.expiresAt,
       },
     });
-
     const accessToken = fastify.issueAccessToken({
       userId: user.id,
       organizationId: organization.id,
@@ -190,16 +190,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       isSuperAdmin: user.isSuperAdmin,
     });
     const expiresIn = 15 * 60;
-
-    const userPayload = {
-      id: user.id,
-      email: user.email,
-      roles,
-      isSuperAdmin: user.isSuperAdmin,
-    };
-
     reply.send({
-      user: userPayload,
+      user: { id: user.id, email: user.email, roles, isSuperAdmin: user.isSuperAdmin },
       organization,
       roles,
       accessToken,
@@ -207,6 +199,33 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       expiresIn,
     });
   });
+
+  // Returns the list of organizations the authenticated user can access.
+  fastify.get(
+    '/auth/organizations',
+    { preHandler: fastify.authenticate.bind(fastify) },
+    async (request, reply) => {
+      const user = request.user;
+      if (!user) {
+        throw new HttpProblemError({ status: 401, title: 'UNAUTHENTICATED', detail: 'Authentication required.' });
+      }
+      // Fetch organizations from roles table to ensure up-to-date access list.
+      const roleRows = await request.prisma.userOrgRole.findMany({
+        where: { userId: user.id },
+        select: { organizationId: true },
+      });
+      const orgIds = [...new Set(roleRows.map((r) => r.organizationId))];
+      if (orgIds.length === 0) {
+        return reply.send({ organizations: [] });
+      }
+      const organizations = await request.prisma.organization.findMany({
+        where: { id: { in: orgIds } },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      });
+      reply.send({ organizations });
+    }
+  );
 
   fastify.post('/auth/refresh', async (request, reply) => {
     const body = parseBody(tokenBodySchema, request.body);
@@ -376,9 +395,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   );
 };
 
-function parseBody<T>(schema: z.ZodType<T>, payload: unknown): T {
+// log est laissé en unknown pour tolérer les différences de types entre fastify/pino.
+function parseBody<T>(schema: z.ZodType<T>, payload: unknown, log?: unknown): T {
   const result = schema.safeParse(payload);
   if (!result.success) {
+    if (log && typeof (log as { debug?: (...args: unknown[]) => void }).debug === 'function') {
+      (log as { debug: (obj: unknown, msg: string) => void }).debug(
+        { validationIssues: result.error.flatten() },
+        'Validation failed'
+      );
+    }
     throw new HttpProblemError({
       status: 400,
       title: 'VALIDATION_ERROR',
@@ -386,7 +412,6 @@ function parseBody<T>(schema: z.ZodType<T>, payload: unknown): T {
       cause: result.error,
     });
   }
-
   return result.data;
 }
 

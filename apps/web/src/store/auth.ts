@@ -25,6 +25,12 @@ interface LoginResponse {
   organization?: OrganizationSummary;
 }
 
+interface LoginSelectionResponse {
+  user: { id: string; email: string; isSuperAdmin?: boolean };
+  organizations: OrganizationSummary[];
+  requiresOrganizationSelection: true;
+}
+
 interface RefreshResponse {
   accessToken: string;
   refreshToken: string;
@@ -46,6 +52,8 @@ interface AuthState extends PersistedSession {
   error: string | null;
   refreshTimeoutId: RefreshTimeout;
   isInitialized: boolean;
+  // When backend indicates multiple orgs, store them temporarily until user selects one.
+  pendingOrganizations: OrganizationSummary[] | null;
 }
 
 const STORAGE_KEY = 'asso.auth.session';
@@ -77,6 +85,7 @@ export const useAuthStore = defineStore('auth', {
     error: null,
     refreshTimeoutId: null,
     isInitialized: false,
+    pendingOrganizations: null,
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.accessToken),
@@ -156,7 +165,24 @@ export const useAuthStore = defineStore('auth', {
           throw new Error(await readErrorMessage(response));
         }
 
-        const data = (await response.json()) as LoginResponse;
+        const data = (await response.json()) as LoginResponse | LoginSelectionResponse;
+
+        if ('requiresOrganizationSelection' in data) {
+          // Multi-org scenario: defer completing login until org chosen.
+            this.pendingOrganizations = data.organizations;
+            this.user = {
+              id: data.user.id,
+              email: data.user.email,
+              roles: [],
+              isSuperAdmin: data.user.isSuperAdmin,
+            };
+            this.status = 'idle';
+            // Persist partial user so UI can show org picker.
+            this.persistSession();
+            return;
+        }
+
+        this.pendingOrganizations = null;
         this.applySession(
           data.accessToken,
           data.refreshToken,

@@ -6,6 +6,21 @@ const emptyStringToUndefined = <T>(schema: z.ZodType<T>) =>
     schema.optional()
   );
 
+// Helper pour parser correctement des booléens depuis les variables d'env.
+// z.coerce.boolean() traite toute string non vide comme true ("false" => true),
+// ce qui n'est pas souhaité pour des flags simples. On accepte plusieurs
+// représentations usuelles.
+const bool = (defaultValue: boolean) =>
+  z
+    .preprocess((value) => {
+      if (typeof value === 'string') {
+        const v = value.trim().toLowerCase();
+        if (['true', '1', 'yes', 'y', 'on'].includes(v)) return true;
+        if (['false', '0', 'no', 'n', 'off', ''].includes(v)) return false;
+      }
+      return value;
+    }, z.boolean().default(defaultValue));
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -27,16 +42,16 @@ export const envSchema = z.object({
   S3_PUBLIC_URL: emptyStringToUndefined(z.string().url()),
   SMTP_HOST: z.string().default(''),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_SECURE: bool(false),
   SMTP_USER: emptyStringToUndefined(z.string()),
   SMTP_PASSWORD: emptyStringToUndefined(z.string()),
   SMTP_FROM: z.string().email().default('no-reply@asso.local'),
-  CLAMAV_ENABLED: z.coerce.boolean().default(false),
+  CLAMAV_ENABLED: bool(false),
   CLAMAV_HOST: emptyStringToUndefined(z.string()),
   CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
   CLAMAV_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
-  METRICS_ENABLED: z.coerce.boolean().default(true),
-  OTEL_ENABLED: z.coerce.boolean().default(false),
+  METRICS_ENABLED: bool(true),
+  OTEL_ENABLED: bool(false),
   OTEL_SERVICE_NAME: z.string().default('asso-api'),
   OTEL_EXPORTER_OTLP_ENDPOINT: emptyStringToUndefined(z.string().url()),
   OTEL_EXPORTER_OTLP_HEADERS: emptyStringToUndefined(z.string()),

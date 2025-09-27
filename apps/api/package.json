@@ -64,8 +64,5 @@
     "typescript": "5.9.2",
     "vitest": "^3.2.4",
     "redis-memory-server": "^0.13.0"
-  },
-  "prisma": {
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   }
 }

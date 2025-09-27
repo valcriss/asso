@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client';
+import argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
@@ -7,11 +8,48 @@ async function applyTenantContext(tx: Prisma.TransactionClient, organizationId: 
   await tx.$executeRaw(statement);
 }
 
+async function ensureAdminUser(organizationId: string): Promise<void> {
+  const email = 'admin@admin.com';
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+
+  let userId: string;
+  if (!existingUser) {
+    const passwordHash = await argon2.hash('password', { type: argon2.argon2id });
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        isSuperAdmin: true, // Accès global pour faciliter le développement / démo.
+      },
+    });
+    userId = user.id;
+    console.log('Utilisateur admin par défaut créé: admin@admin.com / password');
+  } else {
+    userId = existingUser.id;
+  }
+
+  // Vérifie qu'il a bien un rôle ADMIN sur l'organisation de démo.
+  const role = await prisma.userOrgRole.findFirst({
+    where: { userId, organizationId, role: 'ADMIN' },
+  });
+  if (!role) {
+    await prisma.userOrgRole.create({
+      data: {
+        userId,
+        organizationId,
+        role: 'ADMIN',
+      },
+    });
+    console.log("Rôle ADMIN associé à l'organisation de démonstration pour admin@admin.com");
+  }
+}
+
 async function main() {
   const existing = await prisma.organization.findFirst({ where: { name: 'Association Démo' } });
 
   if (existing) {
-    console.log('La donnée de démonstration existe déjà, aucune action nécessaire.');
+    console.log('La donnée de démonstration existe déjà, vérification de l’utilisateur admin...');
+    await ensureAdminUser(existing.id);
     return;
   }
 
@@ -228,7 +266,8 @@ async function main() {
     });
   });
 
-  console.log('Tenant de démonstration créé avec succès.');
+  await ensureAdminUser(organization.id);
+  console.log('Tenant de démonstration créé avec succès (utilisateur admin@admin.com disponible).');
 }
 
 main()
