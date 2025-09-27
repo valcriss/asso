@@ -372,7 +372,7 @@ export async function generateMemberExportPdf(data: MemberExportData): Promise<U
     data.assignments.length > 0
       ? data.assignments.map((assignment) => {
           const periodEnd = assignment.periodEnd ? formatDisplayDate(assignment.periodEnd) : '—';
-          return `• ${formatDisplayDate(assignment.periodStart)} → ${periodEnd} | ${assignment.templateLabel} | ${assignment.status} | ${assignment.amount} ${assignment.currency}`;
+          return `• ${formatDisplayDate(assignment.periodStart)} -> ${periodEnd} | ${assignment.templateLabel} | ${assignment.status} | ${assignment.amount} ${assignment.currency}`;
         })
       : ['Aucune affectation enregistrée']
   );
