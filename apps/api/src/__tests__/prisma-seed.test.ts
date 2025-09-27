@@ -5,8 +5,8 @@ const prismaSeedState = vi.hoisted(() => ({
   userExists: false,
   roleExists: false,
   idCounter: 0,
-  prismaInstance: null as null | any,
-  txClient: null as null | any,
+  prismaInstance: null as MockPrismaClient | null,
+  txClient: null as MockTransactionClient | null,
 }));
 
 const createId = (prefix: string): string => `${prefix}-${++prismaSeedState.idCounter}`;

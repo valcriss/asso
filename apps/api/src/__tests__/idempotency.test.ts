@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SetOptions } from 'redis';
+import type { Mock } from 'vitest';
+import type { SetOptions, RedisClientType } from 'redis';
+import type { FastifyReply } from 'fastify';
 import { InMemoryIdempotencyStore } from '../lib/idempotency/in-memory-store';
 import { RedisIdempotencyStore } from '../lib/idempotency/redis-store';
 import { replayStoredResponse } from '../lib/idempotency/utils';
@@ -34,14 +36,18 @@ describe('RedisIdempotencyStore', () => {
     }
   }
 
-const createRecord = (): IdempotencyRecord => ({
-  status: 'processing',
-  createdAt: Date.now(),
-});
+  const createRecord = (): IdempotencyRecord => ({
+    status: 'processing',
+    createdAt: Date.now(),
+  });
+
+  const toRedisClient = (client: FakeRedisClient): RedisClientType => {
+    return client as unknown as RedisClientType;
+  };
 
   it('stores and retrieves records without ttl', async () => {
     const client = new FakeRedisClient();
-    const store = new RedisIdempotencyStore(client as unknown as any);
+    const store = new RedisIdempotencyStore(toRedisClient(client));
 
     await store.set('test', createRecord(), 0);
 
@@ -54,7 +60,7 @@ const createRecord = (): IdempotencyRecord => ({
 
   it('stores records with ttl and composes redis options', async () => {
     const client = new FakeRedisClient();
-    const store = new RedisIdempotencyStore(client as unknown as any);
+    const store = new RedisIdempotencyStore(toRedisClient(client));
 
     await store.set('with-ttl', createRecord(), 30);
 
@@ -63,7 +69,7 @@ const createRecord = (): IdempotencyRecord => ({
 
   it('only sets new value when NX flag succeeds', async () => {
     const client = new FakeRedisClient();
-    const store = new RedisIdempotencyStore(client as unknown as any);
+    const store = new RedisIdempotencyStore(toRedisClient(client));
 
     const first = await store.setIfNotExists('nx', createRecord(), 10);
     const second = await store.setIfNotExists('nx', createRecord(), 10);
@@ -75,7 +81,7 @@ const createRecord = (): IdempotencyRecord => ({
 
   it('returns null when key is missing', async () => {
     const client = new FakeRedisClient();
-    const store = new RedisIdempotencyStore(client as unknown as any);
+    const store = new RedisIdempotencyStore(toRedisClient(client));
 
     const record = await store.get('missing');
     expect(record).toBeNull();
@@ -83,7 +89,7 @@ const createRecord = (): IdempotencyRecord => ({
 
   it('purges unparsable payloads and bubbles errors', async () => {
     const client = new FakeRedisClient();
-    const store = new RedisIdempotencyStore(client as unknown as any);
+    const store = new RedisIdempotencyStore(toRedisClient(client));
     const fullKey = `${prefix}broken`;
 
     client.store.set(fullKey, '{invalid json');
@@ -95,7 +101,7 @@ const createRecord = (): IdempotencyRecord => ({
 
   it('deletes stored records', async () => {
     const client = new FakeRedisClient();
-    const store = new RedisIdempotencyStore(client as unknown as any);
+    const store = new RedisIdempotencyStore(toRedisClient(client));
     const fullKey = `${prefix}todelete`;
 
     client.store.set(fullKey, JSON.stringify(createRecord()));
@@ -167,14 +173,8 @@ describe('InMemoryIdempotencyStore', () => {
 
 describe('replayStoredResponse', () => {
   it('replays headers, status and decodes base64 body when needed', async () => {
-    const header = vi.fn();
-    const status = vi.fn();
-    const send = vi.fn();
-    const reply = {
-      header: header.mockImplementation(() => reply),
-      status: status.mockImplementation(() => reply),
-      send,
-    } as any;
+    const { fastify, mocks } = createMockReply();
+    const { header, status, send } = mocks;
 
     const stored: StoredIdempotencyResponse = {
       statusCode: 201,
@@ -186,7 +186,7 @@ describe('replayStoredResponse', () => {
       isBase64Encoded: true,
     };
 
-    await replayStoredResponse(reply, stored);
+    await replayStoredResponse(fastify, stored);
 
     expect(header).toHaveBeenCalledWith('content-type', 'application/json');
     expect(header).toHaveBeenCalledWith('x-idempotency-key', 'abc');
@@ -195,14 +195,8 @@ describe('replayStoredResponse', () => {
   });
 
   it('sends plain payloads when not base64 encoded', async () => {
-    const header = vi.fn();
-    const status = vi.fn();
-    const send = vi.fn();
-    const reply = {
-      header: header.mockImplementation(() => reply),
-      status: status.mockImplementation(() => reply),
-      send,
-    } as any;
+    const { fastify, mocks } = createMockReply();
+    const { status, send } = mocks;
 
     const stored: StoredIdempotencyResponse = {
       statusCode: 200,
@@ -211,9 +205,39 @@ describe('replayStoredResponse', () => {
       isBase64Encoded: false,
     };
 
-    await replayStoredResponse(reply, stored);
+    await replayStoredResponse(fastify, stored);
 
     expect(status).toHaveBeenCalledWith(200);
     expect(send).toHaveBeenCalledWith('plain-text');
   });
 });
+
+type HeaderMock = Mock<[string, string], ChainableReply>;
+type StatusMock = Mock<[number], ChainableReply>;
+type SendMock = Mock<[unknown], Promise<FastifyReply>>;
+
+interface ChainableReply extends Pick<FastifyReply, 'header' | 'status' | 'send'> {
+  header: HeaderMock;
+  status: StatusMock;
+  send: SendMock;
+}
+
+function createMockReply(): { fastify: FastifyReply; mocks: ChainableReply } {
+  const header = vi.fn<[string, string], ChainableReply>();
+  const status = vi.fn<[number], ChainableReply>();
+  const send = vi.fn<[unknown], Promise<FastifyReply>>();
+
+  const mocks: ChainableReply = {
+    header,
+    status,
+    send,
+  };
+
+  header.mockImplementation(() => mocks);
+  status.mockImplementation(() => mocks);
+  send.mockImplementation(async () => mocks as unknown as FastifyReply);
+
+  const fastify = { header, status, send } as unknown as FastifyReply;
+
+  return { fastify, mocks };
+}

@@ -141,24 +141,29 @@ describe('buildMemberExportData', () => {
       },
     ];
 
+    const findMember = vi.fn().mockResolvedValue(member);
+    const findAssignments = vi.fn().mockResolvedValue(assignments);
+    const findPayments = vi.fn().mockResolvedValue(payments);
+    const findEntryLines = vi.fn().mockResolvedValue(entryLines);
+
     const client: MemberExportClient = {
       member: {
-        findFirst: vi.fn().mockResolvedValue(member),
+        findFirst: findMember,
       },
       memberFeeAssignment: {
-        findMany: vi.fn().mockResolvedValue(assignments),
+        findMany: findAssignments,
       },
       memberPayment: {
-        findMany: vi.fn().mockResolvedValue(payments),
+        findMany: findPayments,
       },
       entryLine: {
-        findMany: vi.fn().mockResolvedValue(entryLines),
+        findMany: findEntryLines,
       },
     } as unknown as MemberExportClient;
 
     const result = await buildMemberExportData(client, organizationId, memberId);
 
-    expect((client.member as any).findFirst).toHaveBeenCalledWith({
+    expect(findMember).toHaveBeenCalledWith({
       where: { id: memberId, organizationId, deletedAt: null },
     });
     expect(result.member).toEqual({

@@ -57,8 +57,9 @@ describe('idempotencyPlugin', () => {
   it('rejects concurrent processing attempts for the same key', async () => {
     const app = Fastify();
     const processingRecord: IdempotencyRecord = { status: 'processing', createdAt: Date.now() };
+    const getSpy = vi.fn(async () => processingRecord);
     const store: IdempotencyStore = {
-      get: vi.fn(async () => processingRecord),
+      get: getSpy,
       set: vi.fn(),
     };
 
@@ -78,7 +79,7 @@ describe('idempotencyPlugin', () => {
       statusCode: 409,
       message: expect.stringContaining('Another request with the same Idempotency-Key'),
     });
-    expect((store.get as any).mock.calls).toHaveLength(1);
+    expect(getSpy).toHaveBeenCalledTimes(1);
 
     await app.close();
   });
@@ -144,27 +145,20 @@ describe('idempotencyPlugin', () => {
   });
 
   it('rejects requests with multiple idempotency headers', async () => {
-    const captured: Record<string, any> = { preHandler: null };
-    const fastifyStub = {
-      decorate: vi.fn(),
-      decorateRequest: vi.fn(),
-      addHook: vi.fn((hook: string, handler: any) => {
-        if (hook === 'preHandler') {
-          captured.preHandler = handler;
-        }
-      }),
-    } as any;
+    const app = Fastify();
+    await app.register(idempotencyPlugin);
+    app.get('/ping', async () => ({ ok: true }));
+    await app.ready();
 
-    await idempotencyPlugin(fastifyStub, {});
-
-    const request = {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/ping',
       headers: { 'idempotency-key': ['a', 'b'] },
-      idempotencyReplay: false,
-    } as any;
-
-    await expect(captured.preHandler(request, {} as any)).rejects.toMatchObject({
-      status: 400,
-      title: 'Invalid Idempotency-Key header',
     });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ title: 'Invalid Idempotency-Key header' });
+
+    await app.close();
   });
 });

@@ -19,7 +19,7 @@ const buildServerMock = vi.hoisted(() =>
     close: closeMock,
     log: { info: logInfoMock, error: logErrorMock },
     config: { PORT: 3000 },
-  }))
+  })),
 );
 
 vi.mock('../server', () => ({
@@ -27,14 +27,23 @@ vi.mock('../server', () => ({
 }));
 
 describe('main bootstrap', () => {
-  const signalHandlers: Record<string, (...args: any[]) => void> = {};
+  type ShutdownHandler = () => void;
+  type UnhandledRejectionHandler = (reason: unknown) => void;
+  type UncaughtExceptionHandler = (error: Error) => void;
+
+  const signalHandlers: {
+    SIGINT?: ShutdownHandler;
+    SIGTERM?: ShutdownHandler;
+    unhandledRejection?: UnhandledRejectionHandler;
+    uncaughtException?: UncaughtExceptionHandler;
+  } = {};
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let onSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    for (const key of Object.keys(signalHandlers)) {
+    for (const key of Object.keys(signalHandlers) as Array<keyof typeof signalHandlers>) {
       delete signalHandlers[key];
     }
 
@@ -43,10 +52,18 @@ describe('main bootstrap', () => {
     shutdownTelemetryMock.mockImplementation(async () => {});
 
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
-    onSpy = vi.spyOn(process, 'on').mockImplementation((event: string, handler: (...args: any[]) => void) => {
-      signalHandlers[event] = handler;
-      return process;
-    });
+    onSpy = vi
+      .spyOn(process, 'on')
+      .mockImplementation((event: NodeJS.Signals | 'unhandledRejection' | 'uncaughtException', handler: (...args: unknown[]) => void) => {
+        if (event === 'SIGINT' || event === 'SIGTERM') {
+          signalHandlers[event] = handler as ShutdownHandler;
+        } else if (event === 'unhandledRejection') {
+          signalHandlers.unhandledRejection = handler as UnhandledRejectionHandler;
+        } else if (event === 'uncaughtException') {
+          signalHandlers.uncaughtException = handler as UncaughtExceptionHandler;
+        }
+        return process;
+      });
   });
 
   afterEach(() => {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import sentryPlugin from '../sentry';
 
 const initMock = vi.hoisted(() => vi.fn());
@@ -27,8 +28,34 @@ vi.mock('../../lib/http/tenant', () => ({
   getTenantIdentifier: tenantIdentifierMock,
 }));
 
-function createFastifyStub(configOverrides: Partial<Record<string, unknown>> = {}) {
-  const hooks: Record<string, any> = {};
+interface FastifySentryStub {
+  config: {
+    NODE_ENV: string;
+    SENTRY_ENVIRONMENT: string;
+    SENTRY_TRACES_SAMPLE_RATE: number;
+    SENTRY_DSN?: string;
+  };
+  log: {
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
+  addHook: ReturnType<typeof vi.fn>;
+  hooks: {
+    onError?: OnErrorHook;
+    onClose?: CloseHook;
+  };
+}
+
+type OnErrorHook = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  error: unknown,
+) => void | Promise<void>;
+
+type CloseHook = () => void | Promise<void>;
+
+function createFastifyStub(configOverrides: Partial<Record<string, unknown>> = {}): FastifySentryStub {
+  const hooks: { onError?: OnErrorHook; onClose?: CloseHook } = {};
   const log = {
     info: vi.fn(),
     warn: vi.fn(),
@@ -41,21 +68,27 @@ function createFastifyStub(configOverrides: Partial<Record<string, unknown>> = {
     ...configOverrides,
   };
 
-  return {
+  const stub: FastifySentryStub = {
     config,
     log,
-    addHook: vi.fn((hook: string, handler: any) => {
-      hooks[hook] = handler;
+    addHook: vi.fn((hook: 'onError' | 'onClose', handler: OnErrorHook | CloseHook) => {
+      if (hook === 'onError') {
+        hooks.onError = handler as OnErrorHook;
+      } else {
+        hooks.onClose = handler as CloseHook;
+      }
     }),
     hooks,
   };
+
+  return stub;
 }
 
 describe('sentry plugin', () => {
   it('skips initialization when DSN is missing', async () => {
     const fastify = createFastifyStub();
 
-    await sentryPlugin(fastify as any);
+    await sentryPlugin(fastify as unknown as FastifyInstance);
 
     expect(fastify.log.info).toHaveBeenCalledWith(
       'Sentry DSN not provided. Error tracking is disabled.',
@@ -67,7 +100,7 @@ describe('sentry plugin', () => {
   it('configures sentry, captures errors, and closes gracefully', async () => {
     const fastify = createFastifyStub({ SENTRY_DSN: 'https://dsn' });
 
-    await sentryPlugin(fastify as any);
+    await sentryPlugin(fastify as unknown as FastifyInstance);
 
     expect(initMock).toHaveBeenCalledWith({
       dsn: 'https://dsn',
@@ -75,6 +108,12 @@ describe('sentry plugin', () => {
       tracesSampleRate: 0.4,
     });
     expect(fastify.log.info).toHaveBeenCalledWith('Sentry error tracking enabled.');
+
+    type RequestWithExtras = FastifyRequest & {
+      routeOptions?: { url?: string };
+      user?: { id: string; organizationId?: string };
+      log: { warn: ReturnType<typeof vi.fn> };
+    };
 
     const request = {
       id: 'req-1',
@@ -84,14 +123,14 @@ describe('sentry plugin', () => {
       routeOptions: { url: '/members/:id' },
       user: { id: 'user-1', organizationId: 'org-1' },
       log: { warn: vi.fn() },
-    } as any;
-    const reply = { statusCode: 500 } as any;
+    } as RequestWithExtras;
+    const reply = { statusCode: 500 } as unknown as FastifyReply;
     const error = new Error('Boom');
 
     const scope = scopeMock();
     withScopeMock.mockImplementationOnce((fn) => fn(scope));
 
-    await fastify.hooks.onError(request, reply, error);
+    await fastify.hooks.onError?.(request, reply, error);
 
     expect(scope.setTag).toHaveBeenCalledWith('request_id', 'req-1');
     expect(scope.setUser).toHaveBeenCalledWith({ id: 'user-1', organizationId: 'org-1' });
@@ -116,11 +155,11 @@ describe('sentry plugin', () => {
       headers: { 'x-tenant-id': 'tenant-header' },
       routeOptions: { url: '/members' },
       log: { warn: vi.fn() },
-    } as any;
+    } as RequestWithExtras;
 
     flushMock.mockRejectedValueOnce(new Error('flush failed'));
 
-    await fastify.hooks.onError(requestWithoutUser, { statusCode: 400 } as any, error);
+    await fastify.hooks.onError?.(requestWithoutUser, { statusCode: 400 } as unknown as FastifyReply, error);
 
     expect(scopeWithoutUser.setContext).toHaveBeenCalledWith('organization', { id: 'tenant-header' });
     expect(requestWithoutUser.log.warn).toHaveBeenCalledWith(
@@ -129,7 +168,7 @@ describe('sentry plugin', () => {
     );
 
     closeMock.mockRejectedValueOnce(new Error('close failed'));
-    await fastify.hooks.onClose();
+    await fastify.hooks.onClose?.();
     expect(closeMock).toHaveBeenCalledWith(2000);
     expect(fastify.log.warn).toHaveBeenCalledWith(
       { err: expect.any(Error) },
