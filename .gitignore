@@ -26,3 +26,7 @@ coverage/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Generated Prisma helpers
+prisma.config.js
+seed.js
