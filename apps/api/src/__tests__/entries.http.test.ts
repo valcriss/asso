@@ -83,14 +83,7 @@ describe('entries HTTP routes', () => {
     expect(secondResponse.statusCode).toBe(201);
     expect(secondResponse.body.data.reference).toBe('2025-BAN-000002');
 
-    const entries = await prisma.$transaction(async (tx) => {
-      await applyTenantContext(tx, organizationId);
-      return tx.entry.findMany({
-        where: { organizationId },
-        include: { lines: true },
-        orderBy: { createdAt: 'asc' },
-      });
-    });
+    const entries = await waitForEntries(organizationId, 2);
     expect(entries).toHaveLength(2);
     expect(entries[0].createdBy).toBe(userId);
   });
@@ -259,4 +252,34 @@ async function seedAccountingFixtures(organizationId: string, options: Accountin
       creditAccount,
     };
   });
+}
+
+async function waitForEntries(organizationId: string, expectedCount: number) {
+  const deadline = Date.now() + 1500;
+  let lastSeen = [] as Awaited<ReturnType<typeof loadEntries>>;
+
+  while (Date.now() < deadline) {
+    lastSeen = await loadEntries(organizationId);
+    if (lastSeen.length === expectedCount) {
+      return lastSeen;
+    }
+    await delay(50);
+  }
+
+  return lastSeen;
+}
+
+async function loadEntries(organizationId: string) {
+  return prisma.$transaction(async (tx) => {
+    await applyTenantContext(tx, organizationId);
+    return tx.entry.findMany({
+      where: { organizationId },
+      include: { lines: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  });
+}
+
+async function delay(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
